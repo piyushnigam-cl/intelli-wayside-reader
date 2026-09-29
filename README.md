@@ -59,7 +59,7 @@ curl -X POST -H 'Content-Type: application/json' \
 sleep 12; curl localhost:18082/api/v1/passes/latest
 ```
 
-Measured 2026-09-29 on `intellisbc`: 8/8 axles at both heads, `DOWN`, 45.0 km/h, both tags,
+Measured 2026-09-29 on `intellisbc2`: 8/8 axles at both heads, `DOWN`, 45.0 km/h, both tags,
 `CLEARED`. The result was POSTed to a mock cloud with the Bearer token.
 
 ## Deploy (wayside boards only)

@@ -46,6 +46,8 @@
   th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
   td.result { font-size: 13px; min-width: 9em; }
+  td.enc { font-size: 13px; min-width: 11em; }
+  td.enc.private { color: var(--warn); }
   .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
   .empty { color: var(--muted); padding: 22px 6px; text-align: center; }
   .note { color: var(--muted); font-size: 12.5px; margin-top: 12px; }
@@ -69,12 +71,14 @@
       <table>
         <thead>
           <tr><th>#</th><th>TID (read only)</th><th>EPC (edit, then Write)</th>
-              <th>RSSI</th><th>Reads</th><th></th><th>Result</th></tr>
+              <th>Encoding</th><th>RSSI</th><th>Reads</th><th></th><th>Result</th></tr>
         </thead>
-        <tbody id="rows"><tr><td colspan="7" class="empty">Press Read.</td></tr></tbody>
+        <tbody id="rows"><tr><td colspan="8" class="empty">Press Read.</td></tr></tbody>
       </table>
     </div>
-    <p class="note">EPC: hex, a multiple of 4 digits (whole 16-bit words), up to 60. Reads and writes are
+    <p class="note">Encoding: the tag's PC word says GS1 or ISO; a GS1 header byte names the scheme;
+      "Private" means only the writer's own specification can decode it. EPC: hex, a multiple of
+      4 digits (whole 16-bit words), up to 60. Reads and writes are
       refused while a train is passing. Writes run at the reader's write power; a tag that fails
       to write is usually too far away or facing the wrong way.</p>
   </div>
@@ -135,7 +139,7 @@
     if (!tags.length) {
       const tr = document.createElement("tr");
       const td = cell(tr, "empty");
-      td.colSpan = 7;
+      td.colSpan = 8;
       td.textContent = "No tags in the field.";
       rows.appendChild(tr);
       return;
@@ -156,6 +160,13 @@
       epc.className = "mono epc"; epc.value = t.epc; epc.spellcheck = false;
       epc.dataset.original = t.epc;
       cell(tr).appendChild(epc);
+
+      const enc = cell(tr, "enc");
+      function showEncoding(text) {
+        enc.textContent = text || "";
+        enc.className = "enc" + (text && text.startsWith("Private") ? " private" : "");
+      }
+      showEncoding(t.encoding);
 
       cell(tr, "num").textContent = t.bestRssiDbm + " dBm";
       cell(tr, "num").textContent = t.reads;
@@ -192,6 +203,7 @@
           if (r.verified) {
             result.textContent = "Written and verified"; result.className = "result ok";
             epc.dataset.original = newEpc;
+            showEncoding(r.encoding);
             epc.classList.remove("changed");
             btn.dataset.clean = "1";
           } else {

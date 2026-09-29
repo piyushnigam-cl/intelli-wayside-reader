@@ -53,9 +53,11 @@ public class TagToolService {
     private static final int TID_BLOCKS = 6;
     private static final int TID_BLOCKS_SHORT = 2;
 
-    public record ScannedTag(String epc, String tid, int bestRssiDbm, int reads, String error) {}
+    public record ScannedTag(String epc, String tid, String pc, String encoding, int bestRssiDbm,
+                             int reads, String error) {}
 
-    public record WriteResult(String tid, String epc, boolean verified, String readBack) {}
+    public record WriteResult(String tid, String epc, boolean verified, String readBack,
+                              String encoding) {}
 
     private final ReaderService reader;
     private final PassService passes;
@@ -81,16 +83,19 @@ public class TagToolService {
             List<ScannedTag> tags = new ArrayList<>();
             for (Map.Entry<String, int[]> e : seen.entrySet()) {
                 String tid = null;
+                String pc = null;
                 String error = null;
                 try {
                     ops.withFilter(MemoryBank.EPC, 32, e.getKey(), false);
                     tid = readTid(ops, antenna);
+                    pc = readPc(ops, antenna);
                 } catch (ReaderException ex) {
-                    error = "TID not read: " + ex.getMessage();
+                    error = (tid == null ? "TID" : "PC") + " not read: " + ex.getMessage();
                 } finally {
                     clearQuietly(ops);
                 }
-                tags.add(new ScannedTag(e.getKey(), tid, e.getValue()[0], e.getValue()[1], error));
+                tags.add(new ScannedTag(e.getKey(), tid, pc, EpcEncoding.describe(e.getKey(), pc, tid),
+                        e.getValue()[0], e.getValue()[1], error));
             }
             log.info("Tag tool scan: {} tag(s)", tags.size());
             return tags;
@@ -115,9 +120,15 @@ public class TagToolService {
                 String back = ops.readBank(antenna, MemoryBank.EPC, 2, epc.length() / 4, null,
                         OP_TIMEOUT_MS);
                 boolean ok = back.equalsIgnoreCase(epc);
+                String pc = null;
+                try {
+                    pc = readPc(ops, antenna);
+                } catch (ReaderException ex) {
+                    log.debug("PC not read after the write: {}", ex.getMessage());
+                }
                 log.info("Tag tool wrote EPC {} to TID {}: read back {} ({})", epc, t, back,
                         ok ? "verified" : "MISMATCH");
-                return new WriteResult(t, epc, ok, back);
+                return new WriteResult(t, epc, ok, back, EpcEncoding.describe(epc, pc, t));
             } finally {
                 clearQuietly(ops);
             }
@@ -152,6 +163,11 @@ public class TagToolService {
             throw new ReaderException("Could not set Gen2 session " + session + ": set " + err
                     + ", read back " + got + " = " + back[0]);
         }
+    }
+
+    /** The PC word: EPC bank block 1. Its toggle bit says GS1 or ISO numbering. */
+    private String readPc(TagOperations ops, int antenna) {
+        return ops.readBank(antenna, MemoryBank.EPC, 1, 1, null, OP_TIMEOUT_MS);
     }
 
     private String readTid(TagOperations ops, int antenna) {

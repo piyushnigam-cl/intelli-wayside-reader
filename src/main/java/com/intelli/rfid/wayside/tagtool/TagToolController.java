@@ -31,7 +31,7 @@ public class TagToolController {
 
     public record WriteRequest(String tid, String epc) {}
 
-    @PostMapping("/write")
+    @PostMapping("/epc")
     public TagToolService.WriteResult write(@RequestBody WriteRequest request) {
         return tags.write(request.tid(), request.epc());
     }

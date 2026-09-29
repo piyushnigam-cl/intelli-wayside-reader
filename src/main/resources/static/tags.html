@@ -188,7 +188,7 @@
         setBusy(true);
         result.textContent = "Writing…"; result.className = "result";
         try {
-          const r = await call("POST", "/api/v1/tags/write", { tid: t.tid, epc: newEpc });
+          const r = await call("POST", "/api/v1/tags/epc", { tid: t.tid, epc: newEpc });
           if (r.verified) {
             result.textContent = "Written and verified"; result.className = "result ok";
             epc.dataset.original = newEpc;

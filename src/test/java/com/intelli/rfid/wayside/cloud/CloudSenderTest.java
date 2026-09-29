@@ -59,7 +59,8 @@ class CloudSenderTest {
 
     private static PassResult pass(String id) {
         return new PassResult(PassResult.SCHEMA_VERSION, id, "charkop-01", 7, Instant.parse("2026-09-29T10:00:00Z"),
-                Instant.parse("2026-09-29T10:00:20Z"), StopReason.CLEARED, true,
+                Instant.parse("2026-09-29T10:00:20Z"), "Charkop", "C420460060", "MRS1",
+                StopReason.CLEARED, true,
                 new PassResult.Train(null, null, false, 2, 0, 0, false), List.of(),
                 new PassResult.Wheels("DOWN", null, null, null, null, List.of()),
                 new PassResult.Reader("test", null, "RG_IN"));
@@ -76,6 +77,9 @@ class CloudSenderTest {
         assertThat(mapper.readTree(bodies.get(0)).path("wheels").get("direction").isNull()).isTrue();
         // The version is the first field, so a consumer can check it before anything else.
         assertThat(bodies.get(0)).startsWith("{\"schemaVersion\":1,");
+        // Operator, 2026-09-29: these three by these exact names, immediately above stopReason.
+        assertThat(bodies.get(0)).containsPattern("\"endedAt\":[^,]+,\"Site\":\"Charkop\","
+                + "\"ToolId\":\"C420460060\",\"TrainType\":\"MRS1\",\"stopReason\":\"CLEARED\"");
         assertThat(sender.spoolDepth()).isZero();
     }
 

@@ -12,6 +12,14 @@ public class WaysideProperties {
     /** Per unit, and it goes into every cloud call. Blank is warned about at start-up. */
     private String readerId = "";
 
+    /**
+     * Sent in every pass as "Site", "ToolId" and "TrainType" (operator, 2026-09-29: Charkop,
+     * C420460060, MRS1). Per site, so set in the site config; blank is sent as null.
+     */
+    private String site = "";
+    private String toolId = "";
+    private String trainType = "";
+
     /** Pass history: every published train, one JSON line each, replayable by sequence. */
     private String spoolDir = "/var/lib/intelli/wayside/spool";
     private boolean spoolEnabled = true;
@@ -291,6 +299,12 @@ public class WaysideProperties {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 
+    public String getSite() { return site; }
+    public void setSite(String site) { this.site = site; }
+    public String getToolId() { return toolId; }
+    public void setToolId(String toolId) { this.toolId = toolId; }
+    public String getTrainType() { return trainType; }
+    public void setTrainType(String trainType) { this.trainType = trainType; }
     public String getReaderId() { return readerId; }
     public void setReaderId(String readerId) { this.readerId = readerId; }
     public String getSpoolDir() { return spoolDir; }

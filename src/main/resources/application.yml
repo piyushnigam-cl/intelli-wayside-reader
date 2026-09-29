@@ -95,6 +95,10 @@ rfid:
 wayside:
   # Per unit, must be set in the site config: it is in every cloud call.
   reader-id: ""
+  # Sent in every pass as "Site", "ToolId", "TrainType", just above stopReason. Per site; blank = null.
+  site: ""
+  tool-id: ""
+  train-type: ""
   spool-dir: /var/lib/intelli/wayside/spool
   spool-enabled: true
 

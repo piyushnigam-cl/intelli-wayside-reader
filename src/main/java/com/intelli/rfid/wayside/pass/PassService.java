@@ -162,7 +162,9 @@ public class PassService {
         long sequence = spool.nextSequence();
         PassResult result = new PassResult(PassResult.SCHEMA_VERSION, UUID.randomUUID().toString(),
                 properties.getReaderId(),
-                sequence, pass.startedAt(), pass.endedAt(), pass.stopReason(),
+                sequence, pass.startedAt(), pass.endedAt(), blankToNull(properties.getSite()),
+                blankToNull(properties.getToolId()), blankToNull(properties.getTrainType()),
+                pass.stopReason(),
                 clockSync.isSynced(), pass.train(), pass.tags(), pass.wheels(), readerMeta());
         latest = result;
         synchronized (history) {
@@ -178,6 +180,10 @@ public class PassService {
         }
         cloud.send(result);
         events.publishEvent("pass", result);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private PassResult.Reader readerMeta() {

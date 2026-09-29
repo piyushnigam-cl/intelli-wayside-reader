@@ -1,6 +1,7 @@
 package com.intelli.rfid.wayside.pass;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 
@@ -19,6 +20,11 @@ public record PassResult(
         long sequence,
         Instant startedAt,
         Instant endedAt,
+        // The receiving system's own names, capitalised as given (operator, 2026-09-29), and
+        // placed immediately above stopReason as asked.
+        @JsonProperty("Site") String site,
+        @JsonProperty("ToolId") String toolId,
+        @JsonProperty("TrainType") String trainType,
         StopReason stopReason,
         boolean clockSynced,
         Train train,

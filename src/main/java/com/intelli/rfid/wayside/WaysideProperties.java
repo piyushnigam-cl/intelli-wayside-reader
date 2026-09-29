@@ -102,7 +102,7 @@ public class WaysideProperties {
      *
      * <p>{@code coveredUa} and {@code uncoveredUa} are <b>deviations from the SAMD21's tracked
      * baseline</b>, not absolute currents: the RSR110 datasheet gives 5 mA and "a change" when
-     * damped, without saying which way, so intelli-samd21-fw detects on {@code |I - baseline|}.
+     * damped, without saying which way, so intelli-wayside-reader-mcu detects on {@code |I - baseline|}.
      * {@code uncoveredUa} must be below {@code coveredUa}, or the SAMD21 NAKs the whole command.
      */
     public static class Detect {

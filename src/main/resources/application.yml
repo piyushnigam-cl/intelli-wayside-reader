@@ -112,7 +112,7 @@ wayside:
     link-timeout-ms: 3000
     # UNVERIFIED and deliberately zero: the serial link refuses to start until all three are set.
     # The sensor is the Frauscher RSR110d: 5 mA constant, "a change in current" when damped, with no
-    # direction or size given. So intelli-samd21-fw detects on |I - baseline|, and covered-ua and
+    # direction or size given. So intelli-wayside-reader-mcu detects on |I - baseline|, and covered-ua and
     # uncovered-ua are DEVIATIONS from the tracked baseline, not absolute levels. Set from a capture.
     detect:
       covered-ua: 0

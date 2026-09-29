@@ -58,7 +58,7 @@ class CloudSenderTest {
     }
 
     private static PassResult pass(String id) {
-        return new PassResult(id, "charkop-01", 7, Instant.parse("2026-09-29T10:00:00Z"),
+        return new PassResult(PassResult.SCHEMA_VERSION, id, "charkop-01", 7, Instant.parse("2026-09-29T10:00:00Z"),
                 Instant.parse("2026-09-29T10:00:20Z"), StopReason.CLEARED, true,
                 new PassResult.Train(null, false, 2, 0, false), List.of(),
                 new PassResult.Wheels("DOWN", null, null, null, null, List.of()),
@@ -74,6 +74,8 @@ class CloudSenderTest {
         // A null direction is this reader declining to guess, and must reach the cloud as null.
         assertThat(mapper.readTree(bodies.get(0)).path("wheels").has("direction")).isTrue();
         assertThat(mapper.readTree(bodies.get(0)).path("wheels").get("direction").isNull()).isTrue();
+        // The version is the first field, so a consumer can check it before anything else.
+        assertThat(bodies.get(0)).startsWith("{\"schemaVersion\":1,");
         assertThat(sender.spoolDepth()).isZero();
     }
 

@@ -13,6 +13,7 @@ import java.util.List;
  */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record PassResult(
+        int schemaVersion,
         String id,
         String readerId,
         long sequence,
@@ -24,6 +25,15 @@ public record PassResult(
         List<Tag> tags,
         Wheels wheels,
         Reader reader) {
+
+    /**
+     * The format version, first in every pass so a consumer can check it before reading anything
+     * else. Bump it on any change a consumer could notice (a field removed, renamed or re-typed, or an
+     * enum value changing meaning), together with docs/Wayside-Cloud-JSON.md. Adding a field or an
+     * enum value does not bump it: the document tells consumers to tolerate both. Records spooled
+     * before it existed read back as 0.
+     */
+    public static final int SCHEMA_VERSION = 1;
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Train(String id, boolean decoded, int tagsExpected, int tagsFound,

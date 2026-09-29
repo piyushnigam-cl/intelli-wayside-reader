@@ -160,7 +160,8 @@ public class PassService {
 
     private void publish(PassTracker.ClosedPass pass) {
         long sequence = spool.nextSequence();
-        PassResult result = new PassResult(UUID.randomUUID().toString(), properties.getReaderId(),
+        PassResult result = new PassResult(PassResult.SCHEMA_VERSION, UUID.randomUUID().toString(),
+                properties.getReaderId(),
                 sequence, pass.startedAt(), pass.endedAt(), pass.stopReason(),
                 clockSync.isSynced(), pass.train(), pass.tags(), pass.wheels(), readerMeta());
         latest = result;

@@ -4,6 +4,9 @@ import com.intelli.rfid.core.MemoryBank;
 import com.intelli.rfid.core.ReaderException;
 import com.intelli.rfid.core.TagOperations;
 import com.intelli.rfid.core.model.TagRead;
+import com.uhf.api.cls.Reader.Mtr_Param;
+import com.uhf.api.cls.Reader.READER_ERR;
+import java.util.function.Supplier;
 import com.intelli.rfid.spring.ReaderService;
 import com.intelli.rfid.wayside.pass.PassService;
 import com.intelli.rfid.wayside.pass.PassTracker;
@@ -30,6 +33,13 @@ import org.slf4j.LoggerFactory;
  * lost that second would lose its tags.
  *
  * <p>Filters are sticky module state, so every one is cleared in a {@code finally}.
+ *
+ * <p><b>Session 0 for the duration, then the configured session back.</b> MEASURED 2026-09-29 on
+ * intellisbc2: in the unit's session 1, three of six TID reads straight after the scan failed with
+ * {@code MT_CMD_NO_TAG_ERR}. A tag just inventoried in S1 holds its flag at B for 0.5 to 5 s and
+ * ignores the target-A query that single-tag access runs. That is the "silenced session" cause of
+ * NO_TAG in CLAUDE.md, now met in S1. S0 has no hold-off while the carrier is up. The swap is set and
+ * read back both ways, like applyConfig(), and runs under the reader lock, so no pass sees S0.
  */
 public class TagToolService {
 
@@ -57,7 +67,7 @@ public class TagToolService {
 
     public List<ScannedTag> scan() {
         requireNoTrain();
-        return reader.whilePaused(() -> {
+        return reader.whilePaused(() -> inSession0(() -> {
             Map<String, int[]> seen = new LinkedHashMap<>();   // epc -> {bestRssi, reads}
             for (int round = 0; round < SCAN_ROUNDS; round++) {
                 for (TagRead read : reader.session().inventoryOnce(ROUND_MS)) {
@@ -84,7 +94,7 @@ public class TagToolService {
             }
             log.info("Tag tool scan: {} tag(s)", tags.size());
             return tags;
-        });
+        }));
     }
 
     public WriteResult write(String tid, String newEpc) {
@@ -95,7 +105,7 @@ public class TagToolService {
                     + "4 hex digits, up to 60. Got " + epc.length() + " digits.");
         }
         requireNoTrain();
-        return reader.whilePaused(() -> {
+        return reader.whilePaused(() -> inSession0(() -> {
             TagOperations ops = reader.tagOperations();
             int antenna = antenna();
             try {
@@ -111,7 +121,37 @@ public class TagToolService {
             } finally {
                 clearQuietly(ops);
             }
-        });
+        }));
+    }
+
+    /** Runs {@code work} in Gen2 session 0 and puts the configured session back, verified. */
+    private <T> T inSession0(Supplier<T> work) {
+        int configured = reader.properties().getSession();
+        if (configured == 0) {
+            return work.get();
+        }
+        setSession(0);
+        try {
+            return work.get();
+        } finally {
+            try {
+                setSession(configured);
+            } catch (RuntimeException e) {
+                log.error("Could not restore Gen2 session {} after a tag-tool operation; the reader "
+                        + "is on session 0 until the next reconnect", configured, e);
+            }
+        }
+    }
+
+    private void setSession(int session) {
+        var raw = reader.session().raw();
+        READER_ERR err = raw.ParamSet(Mtr_Param.MTR_PARAM_POTL_GEN2_SESSION, new int[] {session});
+        int[] back = new int[1];
+        READER_ERR got = raw.ParamGet(Mtr_Param.MTR_PARAM_POTL_GEN2_SESSION, back);
+        if (err != READER_ERR.MT_OK_ERR || got != READER_ERR.MT_OK_ERR || back[0] != session) {
+            throw new ReaderException("Could not set Gen2 session " + session + ": set " + err
+                    + ", read back " + got + " = " + back[0]);
+        }
     }
 
     private String readTid(TagOperations ops, int antenna) {

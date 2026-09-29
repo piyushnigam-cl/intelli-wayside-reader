@@ -293,7 +293,9 @@ public class PassTracker {
                 tags.computeIfAbsent(seen.read().epc(), TagAgg::new).add(seen.read());
             }
         }
-        log.info("Pass opened ({})", degradedPass ? "RFID only: wheel link down" : "wheel");
+        log.info("Pass opened ({})", degradedPass
+                ? (gpioTrigger ? "RFID only: GPIO trigger down" : "RFID only: wheel link down")
+                : (gpioTrigger ? "J26 IN1" : "wheel"));
         carrier.passOpen(true);
     }
 

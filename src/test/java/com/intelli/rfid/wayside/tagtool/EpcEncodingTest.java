@@ -10,7 +10,7 @@ class EpcEncodingTest {
     /** A 4-byte TID is the model header every tag of the model shares: it must never target a write. */
     @Test
     void aHeaderOnlyTidIsRefusedBeforeTheReaderIsTouched() {
-        TagToolService service = new TagToolService(null, null);
+        TagToolService service = new TagToolService(null, null, null);
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> service.write("E2C06892", "8A8020013A1D00021F0C5233"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -19,8 +19,10 @@ class EpcEncodingTest {
 
     @Test
     void theCharkopBenchTagsAreTrainSetTags() {
-        assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", "E2C06892200009021F0C5233"))
-                .isEqualTo("Train-set tag: line 02, set 0013, DMC-1, DOWN side, serial 0002");
+        assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", "E2C06892200009021F0C5233", "TS19"))
+                .isEqualTo("TS19: line 02, set 0013, DMC-1, DOWN side, serial 0002");
+        assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", null))
+                .isEqualTo("Train-set tag (TS not in lookup): line 02, set 0013, DMC-1, DOWN side, serial 0002");
     }
 
     @Test

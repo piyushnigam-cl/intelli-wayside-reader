@@ -235,12 +235,16 @@ public class WaysideProperties {
          * measured (2026-09-29), although Table-3 lists serial first. See CarTag.
          */
         private boolean sideBeforeSerial = true;
+        /** CAR_TAG: a site's own train set lookup CSV (line,id2,ts); blank = the packaged table. */
+        private String lookupFile = "";
         /** One tag at each end. */
         private int tagsExpected = 2;
 
         public DecodeMode getDecode() { return decode; }
         public void setDecode(DecodeMode decode) { this.decode = decode; }
         public String getPattern() { return pattern; }
+        public String getLookupFile() { return lookupFile; }
+        public void setLookupFile(String lookupFile) { this.lookupFile = lookupFile; }
         public boolean isSideBeforeSerial() { return sideBeforeSerial; }
         public void setSideBeforeSerial(boolean sideBeforeSerial) { this.sideBeforeSerial = sideBeforeSerial; }
         public void setPattern(String pattern) { this.pattern = pattern; }

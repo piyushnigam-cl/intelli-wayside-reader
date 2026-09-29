@@ -69,10 +69,17 @@ public class TagToolService {
 
     private final ReaderService reader;
     private final PassService passes;
+    private final com.intelli.rfid.wayside.pass.TrainIdDecoder decoder;
 
-    public TagToolService(ReaderService reader, PassService passes) {
+    public TagToolService(ReaderService reader, PassService passes,
+                          com.intelli.rfid.wayside.pass.TrainIdDecoder decoder) {
         this.reader = reader;
         this.passes = passes;
+        this.decoder = decoder;
+    }
+
+    private String encoding(String epc, String pc, String tid) {
+        return EpcEncoding.describe(epc, pc, tid, decoder == null ? null : decoder.trainSetNumber(epc));
     }
 
     public List<ScannedTag> scan() {
@@ -106,7 +113,7 @@ public class TagToolService {
                 } finally {
                     clearQuietly(ops);
                 }
-                tags.add(new ScannedTag(e.getKey(), tid, pc, EpcEncoding.describe(e.getKey(), pc, tid),
+                tags.add(new ScannedTag(e.getKey(), tid, pc, encoding(e.getKey(), pc, tid),
                         e.getValue()[0], e.getValue()[1], error));
             }
             log.info("Tag tool scan: {} tag(s)", tags.size());
@@ -145,7 +152,7 @@ public class TagToolService {
                 }
                 log.info("Tag tool wrote EPC {} to TID {}: read back {} ({})", epc, t, back,
                         ok ? "verified" : "MISMATCH");
-                return new WriteResult(t, epc, ok, back, EpcEncoding.describe(epc, pc, t));
+                return new WriteResult(t, epc, ok, back, encoding(epc, pc, t));
             } finally {
                 clearQuietly(ops);
             }

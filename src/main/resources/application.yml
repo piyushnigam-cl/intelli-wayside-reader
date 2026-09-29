@@ -160,6 +160,11 @@ wayside:
     # CAR_TAG: CAR SIDE precedes CAR SERIAL on every real tag measured, although Table-3 lists
     # serial first. Set false only for tags written in the table's order.
     side-before-serial: true
+    # CAR_TAG: train.id = TrainSetNumber = "TS" + TS NO, looked up by line and the 4-digit set field
+    # (ID-2) in train-sets.csv (operator's table, 2026-09-29). Blank = the packaged table; a path =
+    # a site's own copy (line,id2,ts). Tags whose EPC does not start 8A8 are left out of the JSON
+    # and counted in train.ignoredTags.
+    lookup-file: ""
     tags-expected: 2
 
   cloud:

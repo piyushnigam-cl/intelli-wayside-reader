@@ -42,6 +42,11 @@ public final class EpcEncoding {
      * @param tid hex, or null
      */
     public static String describe(String epc, String pc, String tid) {
+        return describe(epc, pc, tid, null);
+    }
+
+    /** @param trainSetNumber the TrainSetNumber this EPC resolves to (e.g. "TS60"), or null */
+    public static String describe(String epc, String pc, String tid, String trainSetNumber) {
         String e = epc == null ? "" : epc.toUpperCase(Locale.ROOT);
         if (pc != null && pc.length() == 4) {
             int word = Integer.parseInt(pc, 16);
@@ -60,7 +65,8 @@ public final class EpcEncoding {
         }
         com.intelli.rfid.wayside.pass.CarTag car = com.intelli.rfid.wayside.pass.CarTag.parse(e, true);
         if (car != null) {
-            return String.format("Train-set tag: line %s, set %s, %s, %s side, serial %s",
+            return String.format("%s: line %s, set %s, %s, %s side, serial %s",
+                    trainSetNumber != null ? trainSetNumber : "Train-set tag (TS not in lookup)",
                     car.line(), car.trainSet(), car.positionName(), car.side(), car.serial());
         }
         int header = Integer.parseInt(e.substring(0, 2), 16);

@@ -36,8 +36,13 @@ public record PassResult(
     public static final int SCHEMA_VERSION = 1;
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Train(String id, String line, String trainSet, boolean decoded, int tagsExpected,
-                        int tagsFound, boolean complete) {}
+    /**
+     * @param id          the TrainSetNumber, e.g. "TS60" (CAR_TAG mode), or null
+     * @param ignoredTags tags read but left out of {@code tags} because they are not train tags
+     *                    (CAR_TAG: EPC not starting 8A8). Counted so the omission is never silent
+     */
+    public record Train(String id, String line, boolean decoded, int tagsExpected, int tagsFound,
+                        int ignoredTags, boolean complete) {}
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Tag(String epc, String tid, boolean decoded, String trainId, CarTag car,

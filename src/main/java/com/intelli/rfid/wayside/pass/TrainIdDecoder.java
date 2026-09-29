@@ -16,10 +16,13 @@ public class TrainIdDecoder {
     private final WaysideProperties.DecodeMode mode;
     private final Pattern pattern;
     private final boolean sideBeforeSerial;
+    private final TrainSetLookup lookup;
 
     public TrainIdDecoder(WaysideProperties.Train config) {
         this.mode = config.getDecode();
         this.sideBeforeSerial = config.isSideBeforeSerial();
+        this.lookup = mode == WaysideProperties.DecodeMode.CAR_TAG
+                ? TrainSetLookup.load(config.getLookupFile()) : null;
         if (mode == WaysideProperties.DecodeMode.REGEX) {
             if (config.getPattern() == null || config.getPattern().isBlank()) {
                 throw new IllegalStateException(
@@ -38,8 +41,7 @@ public class TrainIdDecoder {
     /** @return the train id, or null when the EPC does not decode (always null in RAW) */
     public String decode(String epc) {
         if (mode == WaysideProperties.DecodeMode.CAR_TAG) {
-            CarTag car = car(epc);
-            return car == null ? null : car.trainId();
+            return trainSetNumber(epc);
         }
         if (pattern == null || epc == null) {
             return null;
@@ -55,5 +57,34 @@ public class TrainIdDecoder {
     /** The car this tag names, in CAR_TAG mode; null in every other mode or when it does not parse. */
     public CarTag car(String epc) {
         return mode == WaysideProperties.DecodeMode.CAR_TAG ? CarTag.parse(epc, sideBeforeSerial) : null;
+    }
+
+    /**
+     * CAR_TAG: the TrainSetNumber (operator's rule, 2026-09-29). {@code 8A8}, then line (2 digits),
+     * then the 4-digit train set field whose value is ID-2; the lookup gives TS NO. Example:
+     * {@code 8A8 02 0038 ...} → line 02, ID-2 038 → {@code TS60}. Needs only those fields, so a tag
+     * whose later fields are unusual still identifies its train. Null when any of them is missing
+     * or the table has no such train.
+     */
+    public String trainSetNumber(String epc) {
+        if (lookup == null || epc == null || epc.length() < 9) {
+            return null;
+        }
+        String e = epc.toUpperCase(java.util.Locale.ROOT);
+        if (!e.startsWith(CarTag.MASK)) {
+            return null;
+        }
+        String line = e.substring(3, 5);
+        String set = e.substring(5, 9);
+        if (!line.chars().allMatch(Character::isDigit) || !set.chars().allMatch(Character::isDigit)) {
+            return null;
+        }
+        return lookup.resolve(Integer.parseInt(line), Integer.parseInt(set));
+    }
+
+    /** CAR_TAG: tags whose EPC does not start 8A8 are not train tags and are left out (operator). */
+    public boolean ignores(String epc) {
+        return mode == WaysideProperties.DecodeMode.CAR_TAG
+                && (epc == null || !epc.toUpperCase(java.util.Locale.ROOT).startsWith(CarTag.MASK));
     }
 }

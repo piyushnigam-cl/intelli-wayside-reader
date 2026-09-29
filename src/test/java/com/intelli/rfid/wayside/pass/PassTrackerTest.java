@@ -338,47 +338,66 @@ class PassTrackerTest {
         });
     }
 
-    @Test
-    void carTagsGiveTheTrainAndBothEndsMakeItComplete() {
+    private void carTagMode() {
         properties.getTrain().setDecode(WaysideProperties.DecodeMode.CAR_TAG);
         build();
-        at(1000);
-        tracker.onTags(List.of(tag("8A8020008A1D00021F0C12E9", 1000)));   // 02-0008 DMC-1
-        at(1500);
-        tracker.onTags(List.of(tag("8A8020008A6D00021F0C11D6", 1500)));   // 02-0008 DMC-2
-        advanceTicking(3000);
-        PassTracker.ClosedPass pass = published.get(0);
-        assertThat(pass.train().id()).isEqualTo("02-0008");
-        assertThat(pass.train().line()).isEqualTo("02");
-        assertThat(pass.train().trainSet()).isEqualTo("0008");
-        assertThat(pass.train().complete()).isTrue();
-        assertThat(pass.tags()).extracting(t -> t.car().positionName()).containsExactly("DMC-1", "DMC-2");
     }
 
     @Test
-    void oneEndOnlyIsTheTrainButNotComplete() {
-        properties.getTrain().setDecode(WaysideProperties.DecodeMode.CAR_TAG);
-        build();
+    void theTrainIdIsTheTrainSetNumberAndBothEndsMakeItComplete() {
+        carTagMode();
         at(1000);
-        tracker.onTags(List.of(tag("8A8020013A1D00021F0C5233", 1000), tag("E2C06892000000021F0C1400", 1000)));
+        tracker.onTags(List.of(tag("8A8020008A1D00021F0C12E9", 1000)));   // 02 / 008 DMC-1
+        at(1500);
+        tracker.onTags(List.of(tag("8A8020008A6D00021F0C11D6", 1500)));   // 02 / 008 DMC-2
+        advanceTicking(3000);
+        PassTracker.ClosedPass pass = published.get(0);
+        assertThat(pass.train().id()).isEqualTo("TS14");
+        assertThat(pass.train().line()).isEqualTo("02");
+        assertThat(pass.train().complete()).isTrue();
+        assertThat(pass.tags()).extracting(PassResult.Tag::trainId).containsOnly("TS14");
+        assertThat(pass.tags()).extracting(t -> t.car().positionName()).containsExactly("DMC-1", "DMC-2");
+    }
+
+    /** Operator, 2026-09-29: a tag whose EPC does not start 8A8 is ignored, and counted. */
+    @Test
+    void tagsNotStarting8A8AreLeftOutAndCounted() {
+        carTagMode();
+        at(1000);
+        tracker.onTags(List.of(tag("8A8020013A1D00021F0C5233", 1000), tag("E2C06892000000021F0C1400", 1000),
+                tag("E2C06892000000021F0C54B5", 1000)));
         advanceTicking(3000);
         PassResult.Train train = published.get(0).train();
-        assertThat(train.id()).isEqualTo("02-0013");
-        assertThat(train.complete()).isFalse();
-        assertThat(train.tagsFound()).isEqualTo(2);
-        assertThat(published.get(0).tags()).filteredOn(t -> !t.decoded()).singleElement()
-                .satisfies(t -> assertThat(t.car()).isNull());
+        assertThat(train.id()).isEqualTo("TS19");
+        assertThat(train.complete()).isFalse();                // one end only
+        assertThat(train.tagsFound()).isEqualTo(1);
+        assertThat(train.ignoredTags()).isEqualTo(2);
+        assertThat(published.get(0).tags()).extracting(PassResult.Tag::epc)
+                .containsExactly("8A8020013A1D00021F0C5233");
     }
 
     @Test
     void tagsFromTwoTrainsGiveNoTrainId() {
-        properties.getTrain().setDecode(WaysideProperties.DecodeMode.CAR_TAG);
-        build();
+        carTagMode();
         at(1000);
         tracker.onTags(List.of(tag("8A8020008A1D00021F0C12E9", 1000), tag("8A8070003A6D00021F0C3F9D", 1000)));
         advanceTicking(3000);
         assertThat(published.get(0).train().id()).isNull();
         assertThat(published.get(0).train().complete()).isFalse();
+        assertThat(published.get(0).tags()).extracting(PassResult.Tag::trainId).containsExactly("TS14", "TS07");
+    }
+
+    @Test
+    void an8a8TagMissingFromTheLookupIsKeptButNotDecoded() {
+        carTagMode();
+        at(1000);
+        tracker.onTags(List.of(tag("8A8020099A1D00021F0C5233", 1000)));   // line 02, ID-2 099: no such train
+        advanceTicking(3000);
+        assertThat(published.get(0).train().id()).isNull();
+        assertThat(published.get(0).tags()).singleElement().satisfies(t -> {
+            assertThat(t.decoded()).isFalse();
+            assertThat(t.car()).isNotNull();
+        });
     }
 
     @Test

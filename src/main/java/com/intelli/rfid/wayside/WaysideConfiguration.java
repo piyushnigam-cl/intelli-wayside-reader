@@ -38,8 +38,10 @@ public class WaysideConfiguration {
 
     @Bean
     public com.intelli.rfid.wayside.tagtool.TagToolService tagToolService(ReaderService reader,
-                                                                          PassService passes) {
-        return new com.intelli.rfid.wayside.tagtool.TagToolService(reader, passes);
+                                                                          PassService passes,
+                                                                          WaysideProperties properties) {
+        return new com.intelli.rfid.wayside.tagtool.TagToolService(reader, passes,
+                new com.intelli.rfid.wayside.pass.TrainIdDecoder(properties.getTrain()));
     }
 
     @Bean(initMethod = "start", destroyMethod = "stop")

@@ -316,7 +316,9 @@ public class PassTracker {
     }
 
     private void close(StopReason reason, long now) {
+        int ignored = (int) tags.keySet().stream().filter(decoder::ignores).count();
         List<PassResult.Tag> tagList = tags.values().stream()
+                .filter(t -> !decoder.ignores(t.epc))
                 .sorted(Comparator.comparing(t -> t.first))
                 .map(t -> {
                     String trainId = decoder.decode(t.epc);
@@ -325,7 +327,7 @@ public class PassTracker {
                 })
                 .toList();
         ClosedPass pass = new ClosedPass(clocks.wall(openedNanos), clocks.wall(now), reason,
-                train(tagList), tagList, wheels());
+                train(tagList, ignored), tagList, wheels());
         state = State.IDLE;
         degraded = false;
         carrier.passOpen(false);
@@ -345,7 +347,7 @@ public class PassTracker {
      * positions of it were read. For car tags a position is the car position, so both ends
      * (DMC-1 and DMC-2) are needed; the same DMC read twice is still one end.
      */
-    private PassResult.Train train(List<PassResult.Tag> tagList) {
+    private PassResult.Train train(List<PassResult.Tag> tagList, int ignored) {
         List<PassResult.Tag> decodedTags = tagList.stream().filter(PassResult.Tag::decoded).toList();
         List<String> ids = decodedTags.stream().map(PassResult.Tag::trainId).distinct().toList();
         String id = ids.size() == 1 ? ids.get(0) : null;
@@ -353,11 +355,10 @@ public class PassTracker {
                 .map(t -> t.car() != null ? "pos" + t.car().position() : t.epc())
                 .distinct().count();
         boolean complete = id != null && positions >= tagsExpected;
-        CarTag any = decodedTags.stream().map(PassResult.Tag::car)
-                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
-        String line = id != null && any != null ? any.line() : null;
-        String set = id != null && any != null ? any.trainSet() : null;
-        return new PassResult.Train(id, line, set, id != null, tagsExpected, tagList.size(), complete);
+        String line = id == null ? null : decodedTags.stream()
+                .map(t -> t.epc().substring(3, 5)).findFirst().orElse(null);
+        return new PassResult.Train(id, line, id != null, tagsExpected, tagList.size(), ignored,
+                complete);
     }
 
     private PassResult.Wheels wheels() {

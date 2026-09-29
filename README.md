@@ -36,6 +36,17 @@ Phases 1 and 2 of the design's build plan are done:
   datasheet sets them.
 - Train-id decoding runs `RAW` until the tag encoding is known, so `complete` is always false.
 
+## J26 IN1/IN2 trigger, and the tag page (2026-09-29, on `intellisbc2`)
+
+- **`wayside.trigger.source: GPIO`**: whichever of J26 IN1 and IN2 fires first starts a train and
+  sets `direction` (IN1 first = `UP`, `in1-is-up` flips it). The other input ends the train. Tested
+  live both ways, and both passes were delivered to the cloud with 200.
+- **`/tags.html`**: Read lists every tag in the field with its TID (read only) and its EPC
+  (editable). Write puts a new EPC on the tag with that TID and reads it back. The API is
+  `GET /api/v1/tags/scan` and `POST /api/v1/tags/epc {tid, epc}`, and needs the COMMISSION scope.
+  It runs in Gen2 session 0 and restores the configured session afterwards; in session 1, half the
+  TID reads failed. It is refused while a train is passing.
+
 ## Build and test
 
 ```bash

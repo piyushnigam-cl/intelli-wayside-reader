@@ -114,8 +114,8 @@ public class PassService {
         }
         reader.subscribe(reads -> executor.execute(() -> tracker.onTags(reads)));
         if (gpio != null) {
-            gpio.start(nanos -> executor.execute(() -> tracker.onTrainStart(nanos)),
-                    nanos -> executor.execute(() -> tracker.onTrainEnd(nanos)));
+            gpio.start(nanos -> executor.execute(() -> tracker.onGpioInput(1, nanos)),
+                    nanos -> executor.execute(() -> tracker.onGpioInput(2, nanos)));
             // The SAMD21 link still runs, for /api/v1/wheel/levels, but it does not bound passes.
             wheels.start(event -> {});
         } else {
@@ -230,9 +230,9 @@ public class PassService {
         return events.subscribe();
     }
 
-    /** Bench: a train start or end as though J26 had seen it. False outside GPIO mode. */
-    public boolean injectTrigger(boolean start) {
-        return gpio != null && gpio.inject(start);
+    /** Bench: an IN1 or IN2 pulse as though J26 had seen it. False outside GPIO mode. */
+    public boolean injectTrigger(boolean in1) {
+        return gpio != null && gpio.inject(in1);
     }
 
     /** Null outside GPIO mode; "WATCHING" or the problem otherwise. */

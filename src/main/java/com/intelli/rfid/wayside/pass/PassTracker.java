@@ -92,6 +92,10 @@ public class PassTracker {
     private final WaysideProperties.Pass config;
     /** J26 IN1/IN2 bound the pass instead of the wheels (a stand-in until the sensors are fitted). */
     private final boolean gpioTrigger;
+    private final boolean in1IsUp;
+    /** GPIO mode: which input started the current train (1 or 2), and the direction that gives. */
+    private int startedBy;
+    private Direction gpioDirection;
     private final AxleBuilder.Config axleConfig;
     private final int tagsExpected;
     private final TrainIdDecoder decoder;
@@ -119,6 +123,7 @@ public class PassTracker {
                        Carrier carrier, Consumer<ClosedPass> publisher) {
         this.config = properties.getPass();
         this.gpioTrigger = properties.getTrigger().getSource() == WaysideProperties.TriggerSource.GPIO;
+        this.in1IsUp = properties.getTrigger().getGpio().isIn1IsUp();
         WaysideProperties.Wheel wheel = properties.getWheel();
         this.axleConfig = new AxleBuilder.Config(wheel.isUpIsAToB(), wheel.getHeadSpacingM(),
                 wheel.getSystemSpacingM(), TimeUnit.MILLISECONDS.toMicros(wheel.getSystemPairMaxMs()));
@@ -174,32 +179,43 @@ public class PassTracker {
     // ---------------------------------------------------------------- GPIO trigger (IN1 / IN2)
 
     /**
-     * IN1: a train has started. Opens a pass and raises the carrier. During the tail of the previous
-     * train it is a new train: the previous one is published first. While a pass is already
-     * occupied it is a repeat of the same start and is ignored.
+     * A pulse on J26 IN1 ({@code input} 1) or IN2 (2). Operator's rule, 2026-09-29:
+     * <ul>
+     *   <li>No train: <b>either input starts one</b>, and the one that did gives the direction
+     *       (IN1 first = UP by default, {@code in1-is-up}).
+     *   <li>A train passing: <b>the other input ends it</b>; the carrier is held rfid-tail-ms for the
+     *       rear tag, then it is published. The same input again is a repeat and is ignored.
+     *   <li>During that tail: either input is a new train. The previous one is published first.
+     * </ul>
      */
-    public void onTrainStart(long atNanos) {
+    public void onGpioInput(int input, long atNanos) {
         long now = clocks.nanos();
         switch (state) {
-            case IDLE -> open(Math.min(atNanos, now), false);
+            case IDLE -> startGpioTrain(input, atNanos, now);
             case TAIL -> {
                 close(StopReason.CLEARED, now);
-                open(Math.min(atNanos, now), false);
+                startGpioTrain(input, atNanos, now);
             }
-            case OCCUPIED -> log.info("Train START while a train is already passing; ignored");
+            case OCCUPIED -> {
+                if (degraded) {
+                    log.info("IN{} during an RFID-only pass; ignored", input);
+                } else if (input == startedBy) {
+                    log.info("IN{} again while its own train is passing; ignored", input);
+                } else {
+                    state = State.TAIL;
+                    tailStartNanos = now;
+                    log.info("IN{}: train END; holding the carrier {} ms for the rear tag", input,
+                            config.getRfidTailMs());
+                }
+            }
         }
     }
 
-    /** IN2: the train has ended. The carrier stays up rfid-tail-ms for the rear tag, then publish. */
-    public void onTrainEnd(long atNanos) {
-        long now = clocks.nanos();
-        if (state == State.OCCUPIED) {
-            state = State.TAIL;
-            tailStartNanos = now;
-            log.info("Train END; holding the carrier {} ms for the rear tag", config.getRfidTailMs());
-        } else {
-            log.info("Train END with no train passing (state {}); ignored", state);
-        }
+    private void startGpioTrain(int input, long atNanos, long now) {
+        startedBy = input;
+        gpioDirection = (input == 1) == in1IsUp ? Direction.UP : Direction.DOWN;
+        log.info("IN{}: train START, direction {}", input, gpioDirection);
+        open(Math.min(atNanos, now), false);
     }
 
     /** The GPIO trigger's health, standing in for the wheel link in GPIO mode. */
@@ -339,12 +355,13 @@ public class PassTracker {
             return new PassResult.Wheels("DOWN", null, null, null, null, faultList);
         }
         if (gpioTrigger) {
-            // Boundaries from J26 IN1/IN2: no wheel data exists to report, so none is invented.
+            // Boundaries and direction from J26 IN1/IN2 (which fired first). No axles or speed
+            // exist to report, so none are invented.
             List<String> all = new ArrayList<>(faultList);
             if (linkLost) {
                 all.add("GPIO trigger lost during the pass");
             }
-            return new PassResult.Wheels("GPIO", null, null, null, null, all);
+            return new PassResult.Wheels("GPIO", gpioDirection, null, null, null, all);
         }
         AxleBuilder.Analysis analysis = AxleBuilder.analyse(pulses, axleConfig, clocks::wall);
         List<String> all = new ArrayList<>(faultList);

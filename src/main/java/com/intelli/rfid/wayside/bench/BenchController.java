@@ -92,20 +92,20 @@ public class BenchController {
         return ResponseEntity.accepted().body(out);
     }
 
-    /** {@code POST /api/bench/trigger?edge=start|end}: J26 IN1 / IN2 without touching a wire. */
+    /** {@code POST /api/bench/trigger?input=in1|in2}: a J26 IN1 / IN2 pulse without a wire. */
     @PostMapping("/trigger")
     public ResponseEntity<Map<String, Object>> trigger(
-            @org.springframework.web.bind.annotation.RequestParam("edge") String edge) {
-        boolean start = "start".equalsIgnoreCase(edge);
-        if (!start && !"end".equalsIgnoreCase(edge)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "edge must be start or end"));
+            @org.springframework.web.bind.annotation.RequestParam("input") String input) {
+        boolean in1 = "in1".equalsIgnoreCase(input);
+        if (!in1 && !"in2".equalsIgnoreCase(input)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "input must be in1 or in2"));
         }
         if (properties.getTrigger().getSource() != WaysideProperties.TriggerSource.GPIO) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error",
                     "wayside.trigger.source is " + properties.getTrigger().getSource()));
         }
-        boolean fired = passes.injectTrigger(start);
-        return ResponseEntity.accepted().body(Map.of("edge", edge, "fired", fired,
+        boolean fired = passes.injectTrigger(in1);
+        return ResponseEntity.accepted().body(Map.of("input", input, "fired", fired,
                 "pass", passes.state().name()));
     }
 

@@ -37,8 +37,8 @@ public class WaysideProperties {
         /** Wheel sensors via the SAMD21: the design, once the Frauscher sensors are fitted. */
         WHEELS,
         /**
-         * J26 IN1 starts a train and IN2 ends it. A stand-in for the wheel sensors (operator,
-         * 2026-09-29): no axles, direction or speed, only the pass boundaries.
+         * J26 IN1 and IN2, a stand-in for the wheel sensors (operator, 2026-09-29). Whichever fires
+         * first starts the train and gives its direction; the other one ends it. No axles or speed.
          */
         GPIO
     }
@@ -73,9 +73,14 @@ public class WaysideProperties {
         private String lineBufferCommand = "stdbuf";
         private String chip = "gpiochip0";
         /** J26 IN1 = BCM 23. */
-        private int startLine = 23;
+        private int in1Line = 23;
         /** J26 IN2 = BCM 24. */
-        private int endLine = 24;
+        private int in2Line = 24;
+        /**
+         * Whichever input fires first starts the train, and that names the direction: IN1 first is
+         * UP when this is true. Flip it rather than rewiring if the site's UP runs the other way.
+         */
+        private boolean in1IsUp = true;
         /**
          * true: an input asserted at J26 (24 V, opto on) is GPIO LOW, so "rising" must mean "became
          * active" (gpiomon -l). Measured on the production carrier; the tunnel learned it the hard way.
@@ -91,10 +96,12 @@ public class WaysideProperties {
         public void setLineBufferCommand(String lineBufferCommand) { this.lineBufferCommand = lineBufferCommand; }
         public String getChip() { return chip; }
         public void setChip(String chip) { this.chip = chip; }
-        public int getStartLine() { return startLine; }
-        public void setStartLine(int startLine) { this.startLine = startLine; }
-        public int getEndLine() { return endLine; }
-        public void setEndLine(int endLine) { this.endLine = endLine; }
+        public int getIn1Line() { return in1Line; }
+        public void setIn1Line(int in1Line) { this.in1Line = in1Line; }
+        public int getIn2Line() { return in2Line; }
+        public void setIn2Line(int in2Line) { this.in2Line = in2Line; }
+        public boolean isIn1IsUp() { return in1IsUp; }
+        public void setIn1IsUp(boolean in1IsUp) { this.in1IsUp = in1IsUp; }
         public boolean isActiveLow() { return activeLow; }
         public void setActiveLow(boolean activeLow) { this.activeLow = activeLow; }
         public long getDebounceMs() { return debounceMs; }

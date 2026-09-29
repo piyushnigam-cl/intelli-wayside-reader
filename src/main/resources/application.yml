@@ -100,13 +100,14 @@ wayside:
 
   trigger:
     # What bounds a pass. WHEELS = the Frauscher sensors via the SAMD21 (the design).
-    # GPIO = J26 IN1 starts a train, IN2 ends it: a stand-in until the sensors are fitted, with no
-    # axles, direction or speed (operator, 2026-09-29). Either way, if the trigger itself is down a
+    # GPIO = J26 IN1/IN2, a stand-in until the sensors are fitted (operator, 2026-09-29): whichever
+    # fires first starts the train and gives its direction, the other one ends it. No axles or speed. Either way, if the trigger itself is down a
     # pass falls back to RFID-only.
     source: WHEELS
     gpio:
-      start-line: 23         # J26 IN1
-      end-line: 24           # J26 IN2
+      in1-line: 23           # J26 IN1
+      in2-line: 24           # J26 IN2
+      in1-is-up: true        # IN1 first = UP, IN2 first = DOWN
       # 24 V at J26 pulls the pin LOW through the opto; -l makes "rising" mean "asserted".
       active-low: true
       debounce-ms: 50

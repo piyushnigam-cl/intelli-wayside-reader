@@ -17,8 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Train start on J26 IN1 and train end on IN2 — a stand-in for the Frauscher sensors until they
- * are fitted (operator, 2026-09-29).
+ * J26 IN1 and IN2 — a stand-in for the Frauscher sensors until they are fitted (operator,
+ * 2026-09-29). This class only reports which input fired; what that means for a train (start, end,
+ * direction) is the pass tracker's business.
  *
  * <p>Adapted from the tunnel's {@code GpioEdgeMonitor}, whose every choice was measured on this
  * carrier and is kept for the same reasons:
@@ -43,8 +44,8 @@ public class GpioTrigger implements AutoCloseable {
 
     private final WaysideProperties.Gpio config;
     private final Map<Integer, Long> lastEdgeNanos = new ConcurrentHashMap<>();
-    private volatile LongConsumer onStart = n -> {};
-    private volatile LongConsumer onEnd = n -> {};
+    private volatile LongConsumer onIn1 = n -> {};
+    private volatile LongConsumer onIn2 = n -> {};
     private volatile Process process;
     private volatile Thread reader;
     private volatile boolean running;
@@ -56,9 +57,9 @@ public class GpioTrigger implements AutoCloseable {
         this.config = config;
     }
 
-    public synchronized void start(LongConsumer onStart, LongConsumer onEnd) {
-        this.onStart = onStart;
-        this.onEnd = onEnd;
+    public synchronized void start(LongConsumer onIn1, LongConsumer onIn2) {
+        this.onIn1 = onIn1;
+        this.onIn2 = onIn2;
         if (running) {
             return;
         }
@@ -79,14 +80,14 @@ public class GpioTrigger implements AutoCloseable {
     }
 
     /** Bench: fires a line's handler as though gpiomon had reported the edge, debounce included. */
-    public boolean inject(boolean start) {
-        int line = start ? config.getStartLine() : config.getEndLine();
+    public boolean inject(boolean in1) {
+        int line = in1 ? config.getIn1Line() : config.getIn2Line();
         long nanos = System.nanoTime();
         if (debounced(line, nanos)) {
             return false;
         }
-        log.info("Synthetic train {} (line {})", start ? "START" : "END", line);
-        (start ? onStart : onEnd).accept(nanos);
+        log.info("Synthetic {} (line {})", in1 ? "IN1" : "IN2", line);
+        (in1 ? onIn1 : onIn2).accept(nanos);
         return true;
     }
 
@@ -140,8 +141,8 @@ public class GpioTrigger implements AutoCloseable {
             command.add("--format=%o %s.%n");
             command.add(config.getChip());
         }
-        command.add(String.valueOf(config.getStartLine()));
-        command.add(String.valueOf(config.getEndLine()));
+        command.add(String.valueOf(config.getIn1Line()));
+        command.add(String.valueOf(config.getIn2Line()));
         return command;
     }
 
@@ -182,8 +183,8 @@ public class GpioTrigger implements AutoCloseable {
         process = p;
         started = true;
         problem = null;
-        log.info("Watching train START on line {} and END on line {}: {}", config.getStartLine(),
-                config.getEndLine(), String.join(" ", command));
+        log.info("Watching J26 IN1 on line {} and IN2 on line {}: {}", config.getIn1Line(),
+                config.getIn2Line(), String.join(" ", command));
         boolean sawAnything = false;
         try (BufferedReader out = new BufferedReader(
                 new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
@@ -221,12 +222,12 @@ public class GpioTrigger implements AutoCloseable {
             return true;
         }
         try {
-            if (offset == config.getStartLine()) {
-                log.info("Train START (J26 IN1, line {})", offset);
-                onStart.accept(nanos);
-            } else if (offset == config.getEndLine()) {
-                log.info("Train END (J26 IN2, line {})", offset);
-                onEnd.accept(nanos);
+            if (offset == config.getIn1Line()) {
+                log.info("J26 IN1 (line {})", offset);
+                onIn1.accept(nanos);
+            } else if (offset == config.getIn2Line()) {
+                log.info("J26 IN2 (line {})", offset);
+                onIn2.accept(nanos);
             }
         } catch (RuntimeException e) {
             log.error("Trigger handler for line {} threw", offset, e);

@@ -1,0 +1,166 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: intelli-wayside-reader
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # loggers: change a level on a running unit without a restart (which re-inits the module).
+        # Safe only because ScopeRules maps /actuator/** to ADMIN.
+        include: health,info,metrics,loggers
+  endpoint:
+    health:
+      show-details: always
+
+rfid:
+  security:
+    # ON, and no keys shipped: keys go in /etc/intelli/intelli-wayside-reader/application.yml.
+    # Every /api/v1 path of this app falls through core's ScopeRules to ADMIN.
+    #   java -cp /opt/intelli/lib/intelli-rfid-core.jar com.intelli.rfid.spring.security.ApiKeyTool
+    # Local development only:  --rfid.security.enabled=false
+    enabled: true
+    header: X-API-Key
+    fail-on-empty-keys: true
+    permit-paths:
+      - /actuator/health
+    keys: []
+
+  reader:
+    address: /dev/ttyAMA0
+    # ONE antenna, and the SIM7500 has one port anyway: the J20/J25 choice is the SP4T, set by
+    # GPIO8/9 in the systemd unit, never by this number.
+    antenna-count: 1
+    native-lib-path: /opt/intelli/lib
+    # Only if the module is fw 20260819 AND auth INDIA (fw_probe.py). A fresh SIM7500 refuses RG_IN:
+    # use RG_EU3 there (CLAUDE.md, "Cloning this unit onto a new board").
+    region: RG_IN
+
+    # Radiated power under the Indian limit is still an open question (CLAUDE.md, Thermal). The
+    # triggered carrier keeps the duty cycle to a few percent, which is the thermal half of it.
+    read-power-dbm10: 3000
+    write-power-dbm10: 2700
+    read-mode: NORMAL
+
+    # S1, UNVERIFIED on a moving tag (design sec.5.2). Two tags pass, are read a few times and leave
+    # for good; S1 decays in 0.5-5 s so a tag is not silenced across the train the way S2 silences
+    # it. If read counts come out thin, try S0 and compare on a real pass.
+    session: 1
+    target: 0
+    # Two tags in the field at most: dynamic Q starting at 2.
+    q: -254
+    rf-mode: 107
+    read-duration-ms: 50
+
+    # Off: the train identity is in the EPC, and FastID costs ~25% of the raw read rate on a tag
+    # that is in the field for well under a second at line speed.
+    fast-id: false
+
+    dedup-window-ms: 100
+
+    # Adjacent tracks, if Charkop has them, are rejected here. Tune on site from the bestRssi of
+    # this track's tags against the other track's (design sec.10 q3). -72 rejects nothing we have seen.
+    rssi-threshold-dbm: -72
+
+    # Connect and start inventory at boot; the carrier controller drops it again within a second
+    # when the carrier is TRIGGERED and the wheel link is up.
+    auto-start: true
+    retry-connect: true
+    recover-on-fault: true
+    recover-max-delay-ms: 60000
+    recover-stable-ms: 60000
+
+  gs1:
+    # Commissioning lives in core and is served by every reader app. This unit does not write tags;
+    # the values only keep the controller consistent if someone calls it.
+    company-prefix: "8909478"
+    company-prefix-length: 7
+    filter-value: 1
+    reader-id: 0
+    serial-counter-file: /var/lib/intelli/wayside/serial-counter
+    antenna: 1
+    verify: true
+    valid-eans: []
+
+wayside:
+  # Per unit, must be set in the site config: it is in every cloud call.
+  reader-id: ""
+  spool-dir: /var/lib/intelli/wayside/spool
+  spool-enabled: true
+
+  wheel:
+    # SERIAL = the SAMD21 on UART3. NO SAMD21 FIRMWARE EXISTS YET, so on a board today the link
+    # stays DOWN and every pass is RFID-only (degraded), which is the designed fallback.
+    # SIMULATED = generated trains via POST /api/bench/train. NONE = RFID-only by choice.
+    source: SERIAL
+    port: /dev/ttyAMA3
+    baud: 115200
+    # Proven by a train of known direction, not by review.
+    up-is-a-to-b: true
+    # Rail distance head A -> head B, measured on site. 0 = no speed.
+    head-spacing-m: 0
+    # Between the two systems of one head, from the sensor datasheet. 0 = no single-head fallback.
+    system-spacing-m: 0
+    system-pair-max-ms: 2000
+    link-timeout-ms: 3000
+    # UNVERIFIED and deliberately zero: the serial link refuses to start until all three are set,
+    # from the Frauscher datasheet and then a raw capture (design sec.4.5, sec.10 q6).
+    detect:
+      covered-ua: 0
+      uncovered-ua: 0
+      min-pulse-us: 0
+
+  pass:
+    # max axle spacing / slowest crossing speed, with margin. 15 m at 5 km/h is 10.8 s.
+    axle-gap-ms: 15000
+    max-pass-ms: 600000
+    rfid-lead-ms: 200
+    rfid-tail-ms: 3000
+    # Degraded (RFID-only) mode: silence since the last read that ends a pass. Must exceed the time
+    # between the front tag and the rear tag passing, i.e. train length / slowest speed - a 12-car
+    # EMU (~256 m) at 30 km/h is ~31 s. The default suits a short bench train only.
+    tag-gap-ms: 5000
+
+  rfid:
+    carrier: TRIGGERED
+
+  train:
+    # The EPC encoding is a site question (design sec.10 q4). RAW until it is answered: no train id,
+    # both EPCs reported, and therefore never complete.
+    decode: RAW
+    pattern: ""
+    tags-expected: 2
+
+  cloud:
+    # Empty = nothing is sent; passes stay in the local history. Token in the SITE config only.
+    url: ""
+    token: ""
+    timeout-ms: 5000
+    attempts: 5
+    initial-backoff-ms: 1000
+    max-backoff-ms: 30000
+    replay-interval-ms: 60000
+    max-age-ms: 604800000
+    spool-file: /var/lib/intelli/wayside/cloud.jsonl
+    dead-letter-file: /var/lib/intelli/wayside/cloud-dead.jsonl
+
+  bench:
+    enabled: false
+
+logging:
+  level:
+    com.intelli.rfid: INFO
+  file:
+    name: /opt/intelli/logs/intelli-wayside-reader.log
+  logback:
+    rollingpolicy:
+      max-file-size: 20MB
+      max-history: 14
+      total-size-cap: 500MB

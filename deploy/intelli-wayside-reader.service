@@ -1,0 +1,46 @@
+[Unit]
+Description=Intelli wayside reader (Charkop trackside, v2.x carrier)
+Documentation=file:/home/intelli-sbc/rfid/intelli-rfid-reader/docs/Wayside-Reader-Design.md
+After=network-online.target
+Wants=network-online.target
+# The tunnel and this app both own /dev/ttyAMA0 and the JNI library, and each allows a single owner.
+# Starting one stops the other, rather than letting the second fail to open the module in a way
+# that reads as a hardware fault.
+Conflicts=intelli-rfid-tunnel.service
+
+[Service]
+Type=simple
+User=intelli-sbc
+WorkingDirectory=/opt/intelli/intelli-wayside-reader
+
+# --- Module bring-up: antenna select FIRST, then EN, then NRST (CLAUDE.md, Hardware) -------------
+# Nothing in the application does this, and nothing else on the board raises these pins.
+#   8 / 9   PE42442A SP4T. The SIM7500 has ONE port and cannot see the switch.
+#               8 high, 9 low -> J20 (ANT1)        8 low, 9 high -> J25 (ANT2)
+#           ANT2 here because J20 is the bad branch on intellisbc. PER BOARD: sweep both ports with
+#           /api/diagnostics/antennas, each with an antenna fitted, and pick the good one.
+#   22      RFID_EN, high = on
+#   10      RFID_NRST, low = reset
+ExecStartPre=+/usr/bin/pinctrl set 8 op dl
+ExecStartPre=+/usr/bin/pinctrl set 9 op dh
+ExecStartPre=+/usr/bin/pinctrl set 22 op dh
+ExecStartPre=+/usr/bin/pinctrl set 10 op dh
+
+# The wheel link is UART3 (/dev/ttyAMA3, GPIO4/5), which needs dtoverlay=uart3 in config.txt. The
+# production bring-up sets it. Without it the link stays DOWN and every pass is RFID-only.
+ExecStart=/usr/bin/java \
+  -Djava.library.path=/opt/intelli/lib \
+  -jar /opt/intelli/intelli-wayside-reader/intelli-wayside-reader.jar \
+  --spring.config.additional-location=file:/etc/intelli/intelli-wayside-reader/
+
+# A stopped service is a quiet radio. EN only; NRST stays high. This powers the module OFF, so a
+# probe run after a stop must raise the four pins itself (CLAUDE.md).
+ExecStopPost=+/usr/bin/pinctrl set 22 op dl
+
+Restart=on-failure
+RestartSec=10
+# The JVM exits 143 on SIGTERM; without this a clean stop reads as `failed`.
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

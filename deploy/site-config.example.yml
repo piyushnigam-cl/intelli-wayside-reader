@@ -1,0 +1,29 @@
+# /etc/intelli/intelli-wayside-reader/application.yml  (root:intelli-sbc, mode 640)
+# Overrides the packaged defaults. Everything here is per unit or per site.
+
+rfid:
+  security:
+    keys:
+      - id: ops-admin
+        label: "Intelli operations"
+        sha256: "<sha256 of the issued key>"
+        scopes: [INVENTORY, COMMISSION, ADMIN]
+  reader:
+    # RG_IN only on fw 20260819 with auth INDIA; otherwise RG_EU3.
+    region: RG_IN
+
+wayside:
+  reader-id: charkop-01
+  wheel:
+    # Stays SERIAL. Until the SAMD21 firmware exists the link is DOWN and passes are RFID-only.
+    head-spacing-m: 0          # measured rail to rail on site
+    detect:                    # from the sensor datasheet, then a capture
+      covered-ua: 0
+      uncovered-ua: 0
+      min-pulse-us: 0
+  pass:
+    # RFID-only mode: must exceed front-tag-to-rear-tag time at the slowest speed.
+    tag-gap-ms: 30000
+  cloud:
+    url: ""                    # the cloud endpoint, once it exists
+    token: ""

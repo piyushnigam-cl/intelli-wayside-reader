@@ -36,12 +36,12 @@ public record PassResult(
     public static final int SCHEMA_VERSION = 1;
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Train(String id, boolean decoded, int tagsExpected, int tagsFound,
-                        boolean complete) {}
+    public record Train(String id, String line, String trainSet, boolean decoded, int tagsExpected,
+                        int tagsFound, boolean complete) {}
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Tag(String epc, String tid, boolean decoded, String trainId, Instant firstSeen,
-                      Instant lastSeen, int reads, double bestRssiDbm) {}
+    public record Tag(String epc, String tid, boolean decoded, String trainId, CarTag car,
+                      Instant firstSeen, Instant lastSeen, int reads, double bestRssiDbm) {}
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Wheels(String link, Direction direction, AxleCount axleCount, Speed speedKmh,

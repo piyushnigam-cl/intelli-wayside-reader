@@ -60,7 +60,7 @@ class CloudSenderTest {
     private static PassResult pass(String id) {
         return new PassResult(PassResult.SCHEMA_VERSION, id, "charkop-01", 7, Instant.parse("2026-09-29T10:00:00Z"),
                 Instant.parse("2026-09-29T10:00:20Z"), StopReason.CLEARED, true,
-                new PassResult.Train(null, false, 2, 0, false), List.of(),
+                new PassResult.Train(null, null, null, false, 2, 0, false), List.of(),
                 new PassResult.Wheels("DOWN", null, null, null, null, List.of()),
                 new PassResult.Reader("test", null, "RG_IN"));
     }

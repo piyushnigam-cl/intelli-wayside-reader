@@ -54,7 +54,9 @@ public class WaysideProperties {
         /** No rule yet: train id is null and both EPCs are reported raw. */
         RAW,
         /** {@code train.pattern} is matched against the EPC hex; named group {@code id} is the train. */
-        REGEX
+        REGEX,
+        /** The train-set car tag format, Table-3: 8A8, line, set, car type, position, side, serial. */
+        CAR_TAG
     }
 
     public static class Trigger {
@@ -228,12 +230,19 @@ public class WaysideProperties {
         private DecodeMode decode = DecodeMode.RAW;
         /** REGEX mode: a Java regex over the uppercase EPC hex with a named group {@code id}. */
         private String pattern = "";
+        /**
+         * CAR_TAG mode: CAR SIDE comes before CAR SERIAL NO in the EPC. True on every real tag
+         * measured (2026-09-29), although Table-3 lists serial first. See CarTag.
+         */
+        private boolean sideBeforeSerial = true;
         /** One tag at each end. */
         private int tagsExpected = 2;
 
         public DecodeMode getDecode() { return decode; }
         public void setDecode(DecodeMode decode) { this.decode = decode; }
         public String getPattern() { return pattern; }
+        public boolean isSideBeforeSerial() { return sideBeforeSerial; }
+        public void setSideBeforeSerial(boolean sideBeforeSerial) { this.sideBeforeSerial = sideBeforeSerial; }
         public void setPattern(String pattern) { this.pattern = pattern; }
         public int getTagsExpected() { return tagsExpected; }
         public void setTagsExpected(int tagsExpected) { this.tagsExpected = tagsExpected; }

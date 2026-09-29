@@ -339,6 +339,49 @@ class PassTrackerTest {
     }
 
     @Test
+    void carTagsGiveTheTrainAndBothEndsMakeItComplete() {
+        properties.getTrain().setDecode(WaysideProperties.DecodeMode.CAR_TAG);
+        build();
+        at(1000);
+        tracker.onTags(List.of(tag("8A8020008A1D00021F0C12E9", 1000)));   // 02-0008 DMC-1
+        at(1500);
+        tracker.onTags(List.of(tag("8A8020008A6D00021F0C11D6", 1500)));   // 02-0008 DMC-2
+        advanceTicking(3000);
+        PassTracker.ClosedPass pass = published.get(0);
+        assertThat(pass.train().id()).isEqualTo("02-0008");
+        assertThat(pass.train().line()).isEqualTo("02");
+        assertThat(pass.train().trainSet()).isEqualTo("0008");
+        assertThat(pass.train().complete()).isTrue();
+        assertThat(pass.tags()).extracting(t -> t.car().positionName()).containsExactly("DMC-1", "DMC-2");
+    }
+
+    @Test
+    void oneEndOnlyIsTheTrainButNotComplete() {
+        properties.getTrain().setDecode(WaysideProperties.DecodeMode.CAR_TAG);
+        build();
+        at(1000);
+        tracker.onTags(List.of(tag("8A8020013A1D00021F0C5233", 1000), tag("E2C06892000000021F0C1400", 1000)));
+        advanceTicking(3000);
+        PassResult.Train train = published.get(0).train();
+        assertThat(train.id()).isEqualTo("02-0013");
+        assertThat(train.complete()).isFalse();
+        assertThat(train.tagsFound()).isEqualTo(2);
+        assertThat(published.get(0).tags()).filteredOn(t -> !t.decoded()).singleElement()
+                .satisfies(t -> assertThat(t.car()).isNull());
+    }
+
+    @Test
+    void tagsFromTwoTrainsGiveNoTrainId() {
+        properties.getTrain().setDecode(WaysideProperties.DecodeMode.CAR_TAG);
+        build();
+        at(1000);
+        tracker.onTags(List.of(tag("8A8020008A1D00021F0C12E9", 1000), tag("8A8070003A6D00021F0C3F9D", 1000)));
+        advanceTicking(3000);
+        assertThat(published.get(0).train().id()).isNull();
+        assertThat(published.get(0).train().complete()).isFalse();
+    }
+
+    @Test
     void rawDecodingIsNeverComplete() {
         at(1000);
         tracker.onTags(List.of(tag("E2801190000000000000AA01", 1000),

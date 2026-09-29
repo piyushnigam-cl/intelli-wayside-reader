@@ -58,6 +58,11 @@ public final class EpcEncoding {
         if (e.length() < 2) {
             return "Unknown";
         }
+        com.intelli.rfid.wayside.pass.CarTag car = com.intelli.rfid.wayside.pass.CarTag.parse(e, true);
+        if (car != null) {
+            return String.format("Train-set tag: line %s, set %s, %s, %s side, serial %s",
+                    car.line(), car.trainSet(), car.positionName(), car.side(), car.serial());
+        }
         int header = Integer.parseInt(e.substring(0, 2), 16);
         String scheme = GS1.get(header);
         if (scheme != null) {

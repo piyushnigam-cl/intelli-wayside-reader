@@ -152,10 +152,14 @@ wayside:
     carrier: TRIGGERED
 
   train:
-    # The EPC encoding is a site question (design sec.10 q4). RAW until it is answered: no train id,
-    # both EPCs reported, and therefore never complete.
+    # RAW: no train id, EPCs reported as read, never complete. REGEX: `pattern` with a named group id.
+    # CAR_TAG: the train-set format of Table-3 (docs/Screenshot-Notes.md): 8A8, line, set, car type,
+    # position, side, serial. train.id = "<line>-<set>", and complete = both ends (DMC-1 + DMC-2).
     decode: RAW
     pattern: ""
+    # CAR_TAG: CAR SIDE precedes CAR SERIAL on every real tag measured, although Table-3 lists
+    # serial first. Set false only for tags written in the table's order.
+    side-before-serial: true
     tags-expected: 2
 
   cloud:

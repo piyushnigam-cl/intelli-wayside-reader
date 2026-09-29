@@ -15,9 +15,11 @@ public class TrainIdDecoder {
 
     private final WaysideProperties.DecodeMode mode;
     private final Pattern pattern;
+    private final boolean sideBeforeSerial;
 
     public TrainIdDecoder(WaysideProperties.Train config) {
         this.mode = config.getDecode();
+        this.sideBeforeSerial = config.isSideBeforeSerial();
         if (mode == WaysideProperties.DecodeMode.REGEX) {
             if (config.getPattern() == null || config.getPattern().isBlank()) {
                 throw new IllegalStateException(
@@ -35,6 +37,10 @@ public class TrainIdDecoder {
 
     /** @return the train id, or null when the EPC does not decode (always null in RAW) */
     public String decode(String epc) {
+        if (mode == WaysideProperties.DecodeMode.CAR_TAG) {
+            CarTag car = car(epc);
+            return car == null ? null : car.trainId();
+        }
         if (pattern == null || epc == null) {
             return null;
         }
@@ -44,5 +50,10 @@ public class TrainIdDecoder {
         }
         String id = matcher.group("id");
         return id == null || id.isBlank() ? null : id;
+    }
+
+    /** The car this tag names, in CAR_TAG mode; null in every other mode or when it does not parse. */
+    public CarTag car(String epc) {
+        return mode == WaysideProperties.DecodeMode.CAR_TAG ? CarTag.parse(epc, sideBeforeSerial) : null;
     }
 }

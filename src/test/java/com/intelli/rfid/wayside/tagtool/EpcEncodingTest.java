@@ -18,8 +18,14 @@ class EpcEncodingTest {
     }
 
     @Test
-    void theCharkopBenchTagsArePrivate() {
+    void theCharkopBenchTagsAreTrainSetTags() {
         assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", "E2C06892200009021F0C5233"))
+                .isEqualTo("Train-set tag: line 02, set 0013, DMC-1, DOWN side, serial 0002");
+    }
+
+    @Test
+    void an8aHeaderThatBreaksTheCarRulesIsStillPrivate() {
+        assertThat(EpcEncoding.describe("8A8020013A2D00021F0C5233", "3000", null))
                 .isEqualTo("Private: header 0x8A is not a GS1 scheme");
     }
 

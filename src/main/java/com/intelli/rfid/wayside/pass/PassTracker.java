@@ -320,8 +320,8 @@ public class PassTracker {
                 .sorted(Comparator.comparing(t -> t.first))
                 .map(t -> {
                     String trainId = decoder.decode(t.epc);
-                    return new PassResult.Tag(t.epc, t.tid, trainId != null, trainId, t.first,
-                            t.last, t.reads, t.bestRssi);
+                    return new PassResult.Tag(t.epc, t.tid, trainId != null, trainId,
+                            decoder.car(t.epc), t.first, t.last, t.reads, t.bestRssi);
                 })
                 .toList();
         ClosedPass pass = new ClosedPass(clocks.wall(openedNanos), clocks.wall(now), reason,
@@ -340,13 +340,24 @@ public class PassTracker {
      * Complete = at least {@code tagsExpected} tags that all decode to the same train. In RAW mode
      * nothing decodes, so nothing is ever complete — the honest answer while the encoding is unknown.
      */
+    /**
+     * Complete = every decoded tag names ONE train, and at least {@code tagsExpected} distinct
+     * positions of it were read. For car tags a position is the car position, so both ends
+     * (DMC-1 and DMC-2) are needed; the same DMC read twice is still one end.
+     */
     private PassResult.Train train(List<PassResult.Tag> tagList) {
-        List<String> ids = tagList.stream().filter(PassResult.Tag::decoded)
-                .map(PassResult.Tag::trainId).distinct().toList();
-        long decodedTags = tagList.stream().filter(PassResult.Tag::decoded).count();
+        List<PassResult.Tag> decodedTags = tagList.stream().filter(PassResult.Tag::decoded).toList();
+        List<String> ids = decodedTags.stream().map(PassResult.Tag::trainId).distinct().toList();
         String id = ids.size() == 1 ? ids.get(0) : null;
-        boolean complete = id != null && decodedTags >= tagsExpected;
-        return new PassResult.Train(id, id != null, tagsExpected, tagList.size(), complete);
+        long positions = decodedTags.stream()
+                .map(t -> t.car() != null ? "pos" + t.car().position() : t.epc())
+                .distinct().count();
+        boolean complete = id != null && positions >= tagsExpected;
+        CarTag any = decodedTags.stream().map(PassResult.Tag::car)
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        String line = id != null && any != null ? any.line() : null;
+        String set = id != null && any != null ? any.trainSet() : null;
+        return new PassResult.Train(id, line, set, id != null, tagsExpected, tagList.size(), complete);
     }
 
     private PassResult.Wheels wheels() {

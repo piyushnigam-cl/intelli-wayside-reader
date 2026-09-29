@@ -4,38 +4,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/** The five tags on the intellisbc2 bench, 2026-09-29, against Table-3 (docs/Screenshot-Notes.md). */
+/** Table-3's 12-digit car layout. The EPCs are the intellisbc2 bench tags, 2026-09-29. */
 class CarTagTest {
 
+    /** The operator's real EPC for this tag is 8A8020013A1D; the rest is factory leftover. */
     @Test
-    void decodesTheBenchTags() {
-        assertThat(CarTag.parse("8A8020013A1D00021F0C5233", true))
-                .isEqualTo(new CarTag("02", "0013", "DMC", 1, "DMC-1", "DOWN", "0002"));
-        assertThat(CarTag.parse("8A8020008A6D00021F0C11D6", true))
-                .isEqualTo(new CarTag("02", "0008", "DMC", 6, "DMC-2", "DOWN", "0002"));
-        assertThat(CarTag.parse("8A8070003A1D00021F0C3E62", true).trainId()).isEqualTo("07-0003");
+    void decodesTheTwelveDigitsAndIgnoresTheLeftover() {
+        CarTag expected = new CarTag("02", "0013", "DMC", 1, "DMC-1", "DOWN", null);
+        assertThat(CarTag.parse("8A8020013A1D")).isEqualTo(expected);
+        assertThat(CarTag.parse("8A8020013A1D00021F0C5233")).isEqualTo(expected);
+        assertThat(CarTag.parse("8A8020008A6D00021F0C11D6").positionName()).isEqualTo("DMC-2");
     }
 
-    /** In Table-3's own row order the serial reads D000: the tags put side first. */
+    /** The leftover "0002" is digits too; it must never be reported as the car serial. */
     @Test
-    void theBenchTagsDoNotParseInTableOrder() {
-        assertThat(CarTag.parse("8A8020013A1D00021F0C5233", false)).isNull();
+    void theSerialIsNeverTakenFromTheLeftover() {
+        assertThat(CarTag.parse("8A8020013A1D00021F0C5233").serial()).isNull();
+    }
+
+    @Test
+    void countsTheLeftoverDigits() {
+        assertThat(CarTag.extraDigits("8A8020013A1D")).isZero();
+        assertThat(CarTag.extraDigits("8A8020013A1D00021F0C5233")).isEqualTo(12);
     }
 
     @Test
     void anythingThatBreaksARuleIsNotACarTag() {
-        assertThat(CarTag.parse("E2C06892000000021F0C1400", true)).isNull();   // not 8A8
-        assertThat(CarTag.parse("8A8020013A2D00021F0C5233", true)).isNull();   // DMC at position 2
-        assertThat(CarTag.parse("8A8020013D1D00021F0C5233", true)).isNull();   // car type D
-        assertThat(CarTag.parse("8A8020013A1F00021F0C5233", true)).isNull();   // side F
-        assertThat(CarTag.parse("8A80A0013A1D00021F0C5233", true)).isNull();   // line not digits
-        assertThat(CarTag.parse("8A80200", true)).isNull();                    // too short
+        assertThat(CarTag.parse("E2C06892000000021F0C1400")).isNull();   // not 8A8
+        assertThat(CarTag.parse("8A8020013A2D")).isNull();               // DMC at position 2
+        assertThat(CarTag.parse("8A8020013D1D")).isNull();               // car type D
+        assertThat(CarTag.parse("8A8020013A1F")).isNull();               // side F
+        assertThat(CarTag.parse("8A80A0013A1D")).isNull();               // line not digits
+        assertThat(CarTag.parse("8A8020013A1")).isNull();                // 11 digits
     }
 
     @Test
     void everyCarTypeSitsOnlyAtItsOwnPositions() {
-        assertThat(CarTag.parse("8A8020013B2E01171F0C5233", true).positionName()).isEqualTo("TC-1");
-        assertThat(CarTag.parse("8A8020013C4E01221F0C5233", true).positionName()).isEqualTo("MC-2");
-        assertThat(CarTag.parse("8A8020013C5E01221F0C5233", true)).isNull();   // MC at a TC slot
+        assertThat(CarTag.parse("8A8020013B2E").positionName()).isEqualTo("TC-1");
+        assertThat(CarTag.parse("8A8020013C4E").positionName()).isEqualTo("MC-2");
+        assertThat(CarTag.parse("8A8020013C5E")).isNull();               // MC at a TC slot
     }
 }

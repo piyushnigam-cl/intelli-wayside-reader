@@ -63,11 +63,17 @@ public final class EpcEncoding {
         if (e.length() < 2) {
             return "Unknown";
         }
-        com.intelli.rfid.wayside.pass.CarTag car = com.intelli.rfid.wayside.pass.CarTag.parse(e, true);
+        com.intelli.rfid.wayside.pass.CarTag car = com.intelli.rfid.wayside.pass.CarTag.parse(e);
         if (car != null) {
-            return String.format("%s: line %s, set %s, %s, %s side, serial %s",
+            String text = String.format("%s: line %s, set %s, %s, %s side",
                     trainSetNumber != null ? trainSetNumber : "Train-set tag (TS not in lookup)",
-                    car.line(), car.trainSet(), car.positionName(), car.side(), car.serial());
+                    car.line(), car.trainSet(), car.positionName(), car.side());
+            int extra = com.intelli.rfid.wayside.pass.CarTag.extraDigits(e);
+            // A tag written as 12 digits into a longer EPC without shortening its PC length: the
+            // extra digits are the factory EPC's leftover. Rewriting the 12 digits here fixes it.
+            return extra == 0 ? text
+                    : text + ". Plus " + extra + " leftover digits: rewrite the first "
+                            + com.intelli.rfid.wayside.pass.CarTag.LENGTH + " to trim";
         }
         int header = Integer.parseInt(e.substring(0, 2), 16);
         String scheme = GS1.get(header);

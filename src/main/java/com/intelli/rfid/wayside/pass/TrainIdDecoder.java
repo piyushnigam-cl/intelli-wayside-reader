@@ -15,12 +15,10 @@ public class TrainIdDecoder {
 
     private final WaysideProperties.DecodeMode mode;
     private final Pattern pattern;
-    private final boolean sideBeforeSerial;
     private final TrainSetLookup lookup;
 
     public TrainIdDecoder(WaysideProperties.Train config) {
         this.mode = config.getDecode();
-        this.sideBeforeSerial = config.isSideBeforeSerial();
         this.lookup = mode == WaysideProperties.DecodeMode.CAR_TAG
                 ? TrainSetLookup.load(config.getLookupFile()) : null;
         if (mode == WaysideProperties.DecodeMode.REGEX) {
@@ -56,7 +54,7 @@ public class TrainIdDecoder {
 
     /** The car this tag names, in CAR_TAG mode; null in every other mode or when it does not parse. */
     public CarTag car(String epc) {
-        return mode == WaysideProperties.DecodeMode.CAR_TAG ? CarTag.parse(epc, sideBeforeSerial) : null;
+        return mode == WaysideProperties.DecodeMode.CAR_TAG ? CarTag.parse(epc) : null;
     }
 
     /**

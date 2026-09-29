@@ -19,10 +19,13 @@ class EpcEncodingTest {
 
     @Test
     void theCharkopBenchTagsAreTrainSetTags() {
-        assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", "E2C06892200009021F0C5233", "TS19"))
-                .isEqualTo("TS19: line 02, set 0013, DMC-1, DOWN side, serial 0002");
-        assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", null))
-                .isEqualTo("Train-set tag (TS not in lookup): line 02, set 0013, DMC-1, DOWN side, serial 0002");
+        assertThat(EpcEncoding.describe("8A8020013A1D", "1800", "E2C06892200009021F0C5233", "TS19"))
+                .isEqualTo("TS19: line 02, set 0013, DMC-1, DOWN side");
+        assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3424", "E2C06892200009021F0C5233", "TS19"))
+                .isEqualTo("TS19: line 02, set 0013, DMC-1, DOWN side. Plus 12 leftover digits: "
+                        + "rewrite the first 12 to trim");
+        assertThat(EpcEncoding.describe("8A8020013A1D", "1800", null))
+                .isEqualTo("Train-set tag (TS not in lookup): line 02, set 0013, DMC-1, DOWN side");
     }
 
     @Test

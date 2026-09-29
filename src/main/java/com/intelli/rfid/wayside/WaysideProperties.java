@@ -230,11 +230,6 @@ public class WaysideProperties {
         private DecodeMode decode = DecodeMode.RAW;
         /** REGEX mode: a Java regex over the uppercase EPC hex with a named group {@code id}. */
         private String pattern = "";
-        /**
-         * CAR_TAG mode: CAR SIDE comes before CAR SERIAL NO in the EPC. True on every real tag
-         * measured (2026-09-29), although Table-3 lists serial first. See CarTag.
-         */
-        private boolean sideBeforeSerial = true;
         /** CAR_TAG: a site's own train set lookup CSV (line,id2,ts); blank = the packaged table. */
         private String lookupFile = "";
         /** One tag at each end. */
@@ -245,8 +240,6 @@ public class WaysideProperties {
         public String getPattern() { return pattern; }
         public String getLookupFile() { return lookupFile; }
         public void setLookupFile(String lookupFile) { this.lookupFile = lookupFile; }
-        public boolean isSideBeforeSerial() { return sideBeforeSerial; }
-        public void setSideBeforeSerial(boolean sideBeforeSerial) { this.sideBeforeSerial = sideBeforeSerial; }
         public void setPattern(String pattern) { this.pattern = pattern; }
         public int getTagsExpected() { return tagsExpected; }
         public void setTagsExpected(int tagsExpected) { this.tagsExpected = tagsExpected; }

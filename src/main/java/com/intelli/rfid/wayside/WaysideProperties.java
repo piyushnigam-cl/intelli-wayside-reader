@@ -98,7 +98,12 @@ public class WaysideProperties {
 
     /**
      * Detection thresholds pushed to the SAMD21 at connect. All zero refuses to start the serial
-     * wheel link, rather than detecting against a guess. From the sensor datasheet, then a capture.
+     * wheel link, rather than detecting against a guess.
+     *
+     * <p>{@code coveredUa} and {@code uncoveredUa} are <b>deviations from the SAMD21's tracked
+     * baseline</b>, not absolute currents: the RSR110 datasheet gives 5 mA and "a change" when
+     * damped, without saying which way, so intelli-samd21-fw detects on {@code |I - baseline|}.
+     * {@code uncoveredUa} must be below {@code coveredUa}, or the SAMD21 NAKs the whole command.
      */
     public static class Detect {
         private int coveredUa = 0;

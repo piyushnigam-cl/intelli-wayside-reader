@@ -36,6 +36,12 @@ public class WaysideConfiguration {
         return new ClockSync();
     }
 
+    @Bean
+    public com.intelli.rfid.wayside.tagtool.TagToolService tagToolService(ReaderService reader,
+                                                                          PassService passes) {
+        return new com.intelli.rfid.wayside.tagtool.TagToolService(reader, passes);
+    }
+
     @Bean(initMethod = "start", destroyMethod = "stop")
     public PassService passService(WaysideProperties properties, ReaderService reader,
                                    WheelSource wheels, CloudSender cloud, ClockSync clockSync,

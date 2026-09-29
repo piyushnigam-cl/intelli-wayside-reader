@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tag Read / Write</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5b6573; --line: #d9dee5;
+    --accent: #1f6feb; --accent-text: #ffffff; --ok: #1a7f37; --bad: #cf222e; --warn: #9a6700;
+    --field: #ffffff; --field-ro: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --panel: #171b21; --text: #e6e9ee; --muted: #9aa4b2; --line: #2b323c;
+      --accent: #4c8dff; --accent-text: #0b0d10; --ok: #3fb950; --bad: #ff6b6b; --warn: #d29922;
+      --field: #0f1216; --field-ro: #1e242c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  label { font-size: 13px; color: var(--muted); }
+  input { font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line);
+          border-radius: 6px; padding: 7px 9px; }
+  input.mono, td.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13.5px; }
+  input[readonly] { background: var(--field-ro); color: var(--muted); }
+  input.epc { width: 100%; min-width: 17em; }
+  input.epc.changed { border-color: var(--accent); }
+  input.epc.invalid { border-color: var(--bad); }
+  input.tid { width: 100%; min-width: 17em; }
+  button { font: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px;
+           background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { font-size: 13px; color: var(--muted); min-height: 1.4em; }
+  #status.err { color: var(--bad); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  td.result { font-size: 13px; min-width: 9em; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .empty { color: var(--muted); padding: 22px 6px; text-align: center; }
+  .note { color: var(--muted); font-size: 12.5px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tag Read / Write</h1>
+  <p class="sub" id="sub">Reads every tag in front of the antenna. Change an EPC and press Write:
+    the write is aimed at that tag's TID, so only that tag changes.</p>
+
+  <div class="panel">
+    <div class="bar">
+      <label for="key">API key</label>
+      <input id="key" type="password" autocomplete="off" placeholder="needs COMMISSION scope" size="30">
+      <button id="read" class="primary">Read</button>
+      <span id="status" role="status"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>TID (read only)</th><th>EPC (edit, then Write)</th>
+              <th>RSSI</th><th>Reads</th><th></th><th>Result</th></tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="7" class="empty">Press Read.</td></tr></tbody>
+      </table>
+    </div>
+    <p class="note">EPC: hex, a multiple of 4 digits (whole 16-bit words), up to 60. Reads and writes are
+      refused while a train is passing. Writes run at the reader's write power; a tag that fails
+      to write is usually too far away or facing the wrong way.</p>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const keyInput = $("key"), readBtn = $("read"), statusEl = $("status"), rows = $("rows");
+  let busy = false;
+
+  try { keyInput.value = sessionStorage.getItem("intelliApiKey") || ""; } catch (e) {}
+  keyInput.addEventListener("change", () => {
+    try { sessionStorage.setItem("intelliApiKey", keyInput.value.trim()); } catch (e) {}
+  });
+
+  function status(text, isError) {
+    statusEl.textContent = text;
+    statusEl.className = isError ? "err" : "";
+  }
+
+  function setBusy(on) {
+    busy = on;
+    readBtn.disabled = on;
+    document.querySelectorAll("button.write").forEach((b) => { b.disabled = on || b.dataset.clean === "1"; });
+  }
+
+  async function call(method, path, body) {
+    const key = keyInput.value.trim();
+    if (!key) { throw new Error("Enter the API key first."); }
+    const res = await fetch(path, {
+      method,
+      headers: Object.assign({ "X-API-Key": key }, body ? { "Content-Type": "application/json" } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) {
+      const msg = (data && (data.message || data.detail || data.error)) || res.statusText;
+      if (res.status === 401) throw new Error("API key not accepted.");
+      if (res.status === 403) throw new Error("This key lacks the COMMISSION scope.");
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  const validEpc = (v) => /^[0-9A-F]+$/.test(v) && v.length % 4 === 0 && v.length > 0 && v.length <= 60;
+
+  function cell(tr, className) {
+    const td = document.createElement("td");
+    if (className) td.className = className;
+    tr.appendChild(td);
+    return td;
+  }
+
+  function render(tags) {
+    rows.textContent = "";
+    if (!tags.length) {
+      const tr = document.createElement("tr");
+      const td = cell(tr, "empty");
+      td.colSpan = 7;
+      td.textContent = "No tags in the field.";
+      rows.appendChild(tr);
+      return;
+    }
+    const counts = {};
+    tags.forEach((t) => { counts[t.epc] = (counts[t.epc] || 0) + 1; });
+
+    tags.forEach((t, i) => {
+      const tr = document.createElement("tr");
+      cell(tr, "num").textContent = i + 1;
+
+      const tid = document.createElement("input");
+      tid.className = "mono tid"; tid.readOnly = true; tid.value = t.tid || "";
+      tid.placeholder = t.tid ? "" : "not read";
+      cell(tr).appendChild(tid);
+
+      const epc = document.createElement("input");
+      epc.className = "mono epc"; epc.value = t.epc; epc.spellcheck = false;
+      epc.dataset.original = t.epc;
+      cell(tr).appendChild(epc);
+
+      cell(tr, "num").textContent = t.bestRssiDbm + " dBm";
+      cell(tr, "num").textContent = t.reads;
+
+      const btn = document.createElement("button");
+      btn.className = "write"; btn.textContent = "Write"; btn.dataset.clean = "1"; btn.disabled = true;
+      cell(tr).appendChild(btn);
+
+      const result = cell(tr, "result");
+      if (t.error) { result.textContent = t.error; result.className = "result bad"; }
+      else if (counts[t.epc] > 1) { result.textContent = "Duplicate EPC"; result.className = "result warn"; }
+      if (!t.tid) {
+        epc.readOnly = true;
+        result.textContent = result.textContent || "No TID: cannot target a write";
+      }
+
+      epc.addEventListener("input", () => {
+        const v = epc.value.replace(/\s/g, "").toUpperCase();
+        if (v !== epc.value) epc.value = v;
+        const changed = v !== epc.dataset.original;
+        epc.classList.toggle("changed", changed);
+        epc.classList.toggle("invalid", changed && !validEpc(v));
+        btn.dataset.clean = changed && validEpc(v) ? "0" : "1";
+        btn.disabled = busy || btn.dataset.clean === "1";
+      });
+
+      btn.addEventListener("click", async () => {
+        const newEpc = epc.value;
+        if (!confirm("Write EPC\n" + newEpc + "\nto the tag with TID\n" + t.tid + " ?")) return;
+        setBusy(true);
+        result.textContent = "Writing…"; result.className = "result";
+        try {
+          const r = await call("POST", "/api/v1/tags/write", { tid: t.tid, epc: newEpc });
+          if (r.verified) {
+            result.textContent = "Written and verified"; result.className = "result ok";
+            epc.dataset.original = newEpc;
+            epc.classList.remove("changed");
+            btn.dataset.clean = "1";
+          } else {
+            result.textContent = "Written, but reads back " + r.readBack; result.className = "result bad";
+          }
+        } catch (e) {
+          result.textContent = e.message; result.className = "result bad";
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      rows.appendChild(tr);
+    });
+  }
+
+  readBtn.addEventListener("click", async () => {
+    setBusy(true);
+    status("Reading…");
+    const started = performance.now();
+    try {
+      const tags = await call("GET", "/api/v1/tags/scan");
+      render(tags);
+      status(tags.length + " tag(s), " + ((performance.now() - started) / 1000).toFixed(1) + " s");
+    } catch (e) {
+      status(e.message, true);
+    } finally {
+      setBusy(false);
+    }
+  });
+})();
+</script>
+</body>
+</html>

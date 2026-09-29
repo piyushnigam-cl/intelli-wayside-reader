@@ -64,6 +64,14 @@ public class CarrierController implements PassTracker.Carrier {
 
     /** Never throws: a carrier that will not move costs power, an exception here costs a pass. */
     void reconcile() {
+        // The ReaderService lock is what whilePaused holds for a tag read or write: without it a
+        // train start could raise the carrier in the middle of a TID-filtered write.
+        synchronized (reader) {
+            reconcileLocked();
+        }
+    }
+
+    private void reconcileLocked() {
         try {
             ReaderSession session = reader.session();
             ReaderSession.State state = session.state();

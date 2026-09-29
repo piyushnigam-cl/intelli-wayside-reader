@@ -31,6 +31,9 @@ rfid:
     fail-on-empty-keys: true
     permit-paths:
       - /actuator/health
+      # The tag read/write page. It holds no data: every call it makes sends the key the user
+      # types, and /api/v1/tags/** needs the COMMISSION scope.
+      - /tags.html
     keys: []
 
   reader:

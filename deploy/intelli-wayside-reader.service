@@ -26,6 +26,13 @@ ExecStartPre=+/usr/bin/pinctrl set 9 op dh
 ExecStartPre=+/usr/bin/pinctrl set 22 op dh
 ExecStartPre=+/usr/bin/pinctrl set 10 op dh
 
+# J26 IN1/IN2 (BCM 23/24), the GPIO train trigger: internal pulls OFF. The carrier's external 10 kΩ
+# pull-ups hold an idle input high; the SoC's reset pull-down fights them and leaves 0.44 V of margin
+# instead of 1.0 V (measured 2026-08-31). The tunnel does the same in PinctrlFieldIo. Harmless when
+# the trigger is not GPIO.
+ExecStartPre=+/usr/bin/pinctrl set 23 ip pn
+ExecStartPre=+/usr/bin/pinctrl set 24 ip pn
+
 # The wheel link is UART3 (/dev/ttyAMA3, GPIO4/5), which needs dtoverlay=uart3 in config.txt. The
 # production bring-up sets it. Without it the link stays DOWN and every pass is RFID-only.
 ExecStart=/usr/bin/java \

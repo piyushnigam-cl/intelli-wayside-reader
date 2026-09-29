@@ -35,6 +35,14 @@ public class WaysideHealthIndicator implements HealthIndicator {
         builder.withDetail("currentSequence", passes.currentSequence())
                 .withDetail("pass", passes.state().name())
                 .withDetail("wheelLink", wheels.isUp() ? "UP" : "DOWN");
+        // A broken loop is a sensor an engineer has to go to, so it is named here, per channel.
+        java.util.List<String> faults = wheels.status().channels().stream()
+                .filter(c -> !"NONE".equals(c.fault()))
+                .map(c -> "head " + c.head() + " system " + c.system() + ": " + c.fault())
+                .toList();
+        if (!faults.isEmpty()) {
+            builder.withDetail("wheelFaults", faults);
+        }
         if (!wheels.isUp()) {
             builder.withDetail("wheelLinkReason", String.valueOf(wheels.status().reason()))
                     .withDetail("mode", "RFID-only: axles, direction and speed are not reported");

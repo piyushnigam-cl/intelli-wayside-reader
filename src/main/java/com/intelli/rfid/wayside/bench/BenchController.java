@@ -92,6 +92,23 @@ public class BenchController {
         return ResponseEntity.accepted().body(out);
     }
 
+    /** {@code POST /api/bench/trigger?edge=start|end}: J26 IN1 / IN2 without touching a wire. */
+    @PostMapping("/trigger")
+    public ResponseEntity<Map<String, Object>> trigger(
+            @org.springframework.web.bind.annotation.RequestParam("edge") String edge) {
+        boolean start = "start".equalsIgnoreCase(edge);
+        if (!start && !"end".equalsIgnoreCase(edge)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "edge must be start or end"));
+        }
+        if (properties.getTrigger().getSource() != WaysideProperties.TriggerSource.GPIO) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error",
+                    "wayside.trigger.source is " + properties.getTrigger().getSource()));
+        }
+        boolean fired = passes.injectTrigger(start);
+        return ResponseEntity.accepted().body(Map.of("edge", edge, "fired", fired,
+                "pass", passes.state().name()));
+    }
+
     /** The configured geometry where set, otherwise a plausible 20 m layout. */
     private SimulatedTrain.Geometry geometry() {
         WaysideProperties.Wheel wheel = properties.getWheel();

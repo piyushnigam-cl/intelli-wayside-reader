@@ -90,6 +90,8 @@ public class PassTracker {
     }
 
     private final WaysideProperties.Pass config;
+    /** J26 IN1/IN2 bound the pass instead of the wheels (a stand-in until the sensors are fitted). */
+    private final boolean gpioTrigger;
     private final AxleBuilder.Config axleConfig;
     private final int tagsExpected;
     private final TrainIdDecoder decoder;
@@ -116,6 +118,7 @@ public class PassTracker {
     public PassTracker(WaysideProperties properties, TrainIdDecoder decoder, Clocks clocks,
                        Carrier carrier, Consumer<ClosedPass> publisher) {
         this.config = properties.getPass();
+        this.gpioTrigger = properties.getTrigger().getSource() == WaysideProperties.TriggerSource.GPIO;
         WaysideProperties.Wheel wheel = properties.getWheel();
         this.axleConfig = new AxleBuilder.Config(wheel.isUpIsAToB(), wheel.getHeadSpacingM(),
                 wheel.getSystemSpacingM(), TimeUnit.MILLISECONDS.toMicros(wheel.getSystemPairMaxMs()));
@@ -168,13 +171,51 @@ public class PassTracker {
         }
     }
 
+    // ---------------------------------------------------------------- GPIO trigger (IN1 / IN2)
+
+    /**
+     * IN1: a train has started. Opens a pass and raises the carrier. During the tail of the previous
+     * train it is a new train: the previous one is published first. While a pass is already
+     * occupied it is a repeat of the same start and is ignored.
+     */
+    public void onTrainStart(long atNanos) {
+        long now = clocks.nanos();
+        switch (state) {
+            case IDLE -> open(Math.min(atNanos, now), false);
+            case TAIL -> {
+                close(StopReason.CLEARED, now);
+                open(Math.min(atNanos, now), false);
+            }
+            case OCCUPIED -> log.info("Train START while a train is already passing; ignored");
+        }
+    }
+
+    /** IN2: the train has ended. The carrier stays up rfid-tail-ms for the rear tag, then publish. */
+    public void onTrainEnd(long atNanos) {
+        long now = clocks.nanos();
+        if (state == State.OCCUPIED) {
+            state = State.TAIL;
+            tailStartNanos = now;
+            log.info("Train END; holding the carrier {} ms for the rear tag", config.getRfidTailMs());
+        } else {
+            log.info("Train END with no train passing (state {}); ignored", state);
+        }
+    }
+
+    /** The GPIO trigger's health, standing in for the wheel link in GPIO mode. */
+    public void onTriggerHealth(boolean up) {
+        onLink(up);
+    }
+
     private void onLink(boolean up) {
         linkUp = up;
         if (!up) {
             java.util.Arrays.fill(covered, false);
             if (state != State.IDLE && !degraded) {
                 linkLost = true;
-                passFaults.add("wheel link lost during the pass");
+                if (!gpioTrigger) {
+                    passFaults.add("wheel link lost during the pass");
+                }
             }
         }
     }
@@ -222,7 +263,7 @@ public class PassTracker {
             }
             return;
         }
-        if (state == State.OCCUPIED && now - lastWheelNanos >= ms(config.getAxleGapMs())
+        if (!gpioTrigger && state == State.OCCUPIED && now - lastWheelNanos >= ms(config.getAxleGapMs())
                 && (!anyCovered() || !linkUp)) {
             state = State.TAIL;
             tailStartNanos = now;
@@ -294,6 +335,14 @@ public class PassTracker {
         List<String> faultList = List.copyOf(new java.util.LinkedHashSet<>(passFaults));
         if (degraded && pulses.isEmpty()) {
             return new PassResult.Wheels("DOWN", null, null, null, null, faultList);
+        }
+        if (gpioTrigger) {
+            // Boundaries from J26 IN1/IN2: no wheel data exists to report, so none is invented.
+            List<String> all = new ArrayList<>(faultList);
+            if (linkLost) {
+                all.add("GPIO trigger lost during the pass");
+            }
+            return new PassResult.Wheels("GPIO", null, null, null, null, all);
         }
         AxleBuilder.Analysis analysis = AxleBuilder.analyse(pulses, axleConfig, clocks::wall);
         List<String> all = new ArrayList<>(faultList);

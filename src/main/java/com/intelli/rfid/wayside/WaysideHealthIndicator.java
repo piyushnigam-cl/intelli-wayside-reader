@@ -35,6 +35,10 @@ public class WaysideHealthIndicator implements HealthIndicator {
         builder.withDetail("currentSequence", passes.currentSequence())
                 .withDetail("pass", passes.state().name())
                 .withDetail("wheelLink", wheels.isUp() ? "UP" : "DOWN");
+        if (passes.triggerState() != null) {
+            builder.withDetail("trigger", "GPIO (J26 IN1 start / IN2 end)")
+                    .withDetail("triggerState", passes.triggerState());
+        }
         // A broken loop is a sensor an engineer has to go to, so it is named here, per channel.
         java.util.List<String> faults = wheels.status().channels().stream()
                 .filter(c -> !"NONE".equals(c.fault()))

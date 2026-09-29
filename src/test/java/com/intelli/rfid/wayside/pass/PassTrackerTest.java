@@ -219,6 +219,89 @@ class PassTrackerTest {
         });
     }
 
+    private void gpioMode() {
+        properties.getTrigger().setSource(WaysideProperties.TriggerSource.GPIO);
+        build();
+        tracker.onTriggerHealth(true);
+    }
+
+    @Test
+    void inGpioModeIn1OpensAndIn2ClosesAfterTheTail() {
+        gpioMode();
+        at(900);
+        tracker.onTags(List.of(tag("EARLY", 900)));
+        at(1000);
+        tracker.onTrainStart(now);
+        assertThat(carrier).containsExactly(true);
+        at(2000);
+        tracker.onTags(List.of(tag("FRONT", 2000)));
+        // No wheel ever arrives, and the axle gap must not end a GPIO pass on its own.
+        advanceTicking(40_000);
+        assertThat(tracker.state()).isEqualTo(PassTracker.State.OCCUPIED);
+        at(40_000);
+        tracker.onTags(List.of(tag("REAR", 40_000)));
+        tracker.onTrainEnd(now);
+        assertThat(tracker.state()).isEqualTo(PassTracker.State.TAIL);
+        at(40_300);
+        tracker.onTags(List.of(tag("LATE", 40_300)));
+        advanceTicking(40_600);
+        assertThat(published).singleElement().satisfies(p -> {
+            assertThat(p.stopReason()).isEqualTo(StopReason.CLEARED);
+            assertThat(p.tags()).extracting(PassResult.Tag::epc)
+                    .containsExactly("EARLY", "FRONT", "REAR", "LATE");
+            assertThat(p.wheels().link()).isEqualTo("GPIO");
+            assertThat(p.wheels().direction()).isNull();
+            assertThat(p.wheels().axleCount()).isNull();
+        });
+        assertThat(carrier).containsExactly(true, false);
+    }
+
+    @Test
+    void inGpioModeIn1DuringTheTailPublishesTheLastTrainAndOpensANewOne() {
+        gpioMode();
+        at(1000);
+        tracker.onTrainStart(now);
+        tracker.onTags(List.of(tag("A", 1000)));
+        at(5000);
+        tracker.onTrainEnd(now);
+        at(5100);
+        tracker.onTrainStart(now);
+        assertThat(published).hasSize(1);
+        assertThat(tracker.state()).isEqualTo(PassTracker.State.OCCUPIED);
+        tracker.onTags(List.of(tag("B", 5100)));
+        tracker.onTrainEnd(now);
+        advanceTicking(5100 + 600);
+        assertThat(published).hasSize(2);
+        assertThat(published.get(1).tags()).extracting(PassResult.Tag::epc).containsExactly("B");
+    }
+
+    @Test
+    void inGpioModeStrayEdgesAreIgnoredAndTagsAloneOpenNothing() {
+        gpioMode();
+        at(1000);
+        tracker.onTrainEnd(now);
+        tracker.onTags(List.of(tag("STRAY", 1000)));
+        advanceTicking(10_000);
+        assertThat(tracker.state()).isEqualTo(PassTracker.State.IDLE);
+        at(10_000);
+        tracker.onTrainStart(now);
+        tracker.onTrainStart(now);
+        assertThat(carrier).containsExactly(true);
+    }
+
+    @Test
+    void inGpioModeALostTriggerFallsBackToRfidOnly() {
+        gpioMode();
+        tracker.onTriggerHealth(false);
+        at(1000);
+        tracker.onTags(List.of(tag("T", 1000)));
+        advanceTicking(2200);
+        assertThat(published).singleElement().satisfies(p -> {
+            assertThat(p.stopReason()).isEqualTo(StopReason.TAG_GAP);
+            assertThat(p.wheels().link()).isEqualTo("DOWN");
+        });
+    }
+
     @Test
     void rawDecodingIsNeverComplete() {
         at(1000);

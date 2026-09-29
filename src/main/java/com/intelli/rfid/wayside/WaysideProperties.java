@@ -16,6 +16,7 @@ public class WaysideProperties {
     private String spoolDir = "/var/lib/intelli/wayside/spool";
     private boolean spoolEnabled = true;
 
+    private final Trigger trigger = new Trigger();
     private final Wheel wheel = new Wheel();
     private final Pass pass = new Pass();
     private final Rfid rfid = new Rfid();
@@ -32,6 +33,16 @@ public class WaysideProperties {
         NONE
     }
 
+    public enum TriggerSource {
+        /** Wheel sensors via the SAMD21: the design, once the Frauscher sensors are fitted. */
+        WHEELS,
+        /**
+         * J26 IN1 starts a train and IN2 ends it. A stand-in for the wheel sensors (operator,
+         * 2026-09-29): no axles, direction or speed, only the pass boundaries.
+         */
+        GPIO
+    }
+
     public enum CarrierMode {
         /** On when a train opens a pass, off after the tail. The default (design sec.5.2). */
         TRIGGERED,
@@ -44,6 +55,52 @@ public class WaysideProperties {
         RAW,
         /** {@code train.pattern} is matched against the EPC hex; named group {@code id} is the train. */
         REGEX
+    }
+
+    public static class Trigger {
+        private TriggerSource source = TriggerSource.WHEELS;
+        private final Gpio gpio = new Gpio();
+
+        public TriggerSource getSource() { return source; }
+        public void setSource(TriggerSource source) { this.source = source; }
+        public Gpio getGpio() { return gpio; }
+    }
+
+    /** J26 inputs through {@code gpiomon}, exactly as the tunnel watches them. */
+    public static class Gpio {
+        private String command = "gpiomon";
+        /** gpiomon block-buffers into a pipe; without this edges sit unseen for hours. */
+        private String lineBufferCommand = "stdbuf";
+        private String chip = "gpiochip0";
+        /** J26 IN1 = BCM 23. */
+        private int startLine = 23;
+        /** J26 IN2 = BCM 24. */
+        private int endLine = 24;
+        /**
+         * true: an input asserted at J26 (24 V, opto on) is GPIO LOW, so "rising" must mean "became
+         * active" (gpiomon -l). Measured on the production carrier; the tunnel learned it the hard way.
+         */
+        private boolean activeLow = true;
+        private long debounceMs = 50;
+        /** 0 = detect from gpiomon --version (v2 on Trixie, v1 on Bookworm). */
+        private int libgpiodMajor = 0;
+
+        public String getCommand() { return command; }
+        public void setCommand(String command) { this.command = command; }
+        public String getLineBufferCommand() { return lineBufferCommand; }
+        public void setLineBufferCommand(String lineBufferCommand) { this.lineBufferCommand = lineBufferCommand; }
+        public String getChip() { return chip; }
+        public void setChip(String chip) { this.chip = chip; }
+        public int getStartLine() { return startLine; }
+        public void setStartLine(int startLine) { this.startLine = startLine; }
+        public int getEndLine() { return endLine; }
+        public void setEndLine(int endLine) { this.endLine = endLine; }
+        public boolean isActiveLow() { return activeLow; }
+        public void setActiveLow(boolean activeLow) { this.activeLow = activeLow; }
+        public long getDebounceMs() { return debounceMs; }
+        public void setDebounceMs(long debounceMs) { this.debounceMs = debounceMs; }
+        public int getLibgpiodMajor() { return libgpiodMajor; }
+        public void setLibgpiodMajor(int libgpiodMajor) { this.libgpiodMajor = libgpiodMajor; }
     }
 
     public static class Wheel {
@@ -227,6 +284,7 @@ public class WaysideProperties {
     public void setSpoolDir(String spoolDir) { this.spoolDir = spoolDir; }
     public boolean isSpoolEnabled() { return spoolEnabled; }
     public void setSpoolEnabled(boolean spoolEnabled) { this.spoolEnabled = spoolEnabled; }
+    public Trigger getTrigger() { return trigger; }
     public Wheel getWheel() { return wheel; }
     public Pass getPass() { return pass; }
     public Rfid getRfid() { return rfid; }

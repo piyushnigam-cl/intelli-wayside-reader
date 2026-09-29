@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intelli.rfid.spring.ReaderService;
 import com.intelli.rfid.wayside.cloud.CloudSender;
 import com.intelli.rfid.wayside.pass.PassService;
+import com.intelli.rfid.wayside.trigger.GpioTrigger;
 import com.intelli.rfid.wayside.wheel.NoWheelSource;
 import com.intelli.rfid.wayside.wheel.SerialWheelSource;
 import com.intelli.rfid.wayside.wheel.SimulatedWheelSource;
@@ -39,6 +40,8 @@ public class WaysideConfiguration {
     public PassService passService(WaysideProperties properties, ReaderService reader,
                                    WheelSource wheels, CloudSender cloud, ClockSync clockSync,
                                    ObjectMapper mapper) {
-        return new PassService(properties, reader, wheels, cloud, clockSync, mapper);
+        GpioTrigger gpio = properties.getTrigger().getSource() == WaysideProperties.TriggerSource.GPIO
+                ? new GpioTrigger(properties.getTrigger().getGpio()) : null;
+        return new PassService(properties, reader, wheels, gpio, cloud, clockSync, mapper);
     }
 }

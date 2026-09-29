@@ -213,6 +213,16 @@ public class CloudSender {
                 lastDeliveredAt = Instant.now(clock);
                 return Outcome.DELIVERED;
             }
+            if (status >= 300 && status < 400) {
+                // Not followed. A redirected POST is re-sent as a GET by most clients, so following it
+                // would "succeed" against a page that never saw the pass. The URL is wrong, or the
+                // endpoint wants another scheme or path, and that needs a person.
+                String location = response.headers().firstValue("Location").orElse("(no Location)");
+                log.error("Cloud answered pass {} with {} -> {}. Not following and not retrying: "
+                        + "check wayside.cloud.url.", id, status, location);
+                lastOutcome = "redirected " + status + " to " + location;
+                return Outcome.REJECTED;
+            }
             if (status == 401 || status == 403) {
                 log.error("Cloud rejected pass {} with {}: the token is wrong or revoked. Not "
                         + "retrying. This needs an operator, not a backoff.", id, status);

@@ -53,6 +53,7 @@ public class WaysideController {
         return new WaysideStatus(properties.getReaderId(), reader.session().state().name(),
                 reader.session().isReading(), passes.carrierWanted(),
                 properties.getRfid().getCarrier().name(), passes.state().name(),
+                properties.getTrigger().getSource().name(), passes.triggerState(),
                 clockSync.isSynced(), passes.currentSequence(),
                 latest == null ? null : latest.endedAt(), wheels.status(),
                 new WaysideStatus.Cloud(cloud.isEnabled(), cloud.spoolDepth(),

@@ -89,6 +89,17 @@ class CloudSenderTest {
     }
 
     @Test
+    void aRedirectIsNotFollowedNorRetried() throws Exception {
+        status.set(302);
+        CloudSender sender = sender("");
+        sender.send(pass("p-4"));
+        assertThat(sender.awaitQuiet(5000)).isTrue();
+        assertThat(bodies).hasSize(1);
+        assertThat(sender.spoolDepth()).isZero();
+        assertThat(sender.lastOutcome()).startsWith("redirected 302");
+    }
+
+    @Test
     void aFiveHundredIsRetriedThenSpooledWithTheSameIdAndReplayed() throws Exception {
         status.set(503);
         CloudSender sender = sender("t");

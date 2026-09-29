@@ -9,6 +9,7 @@ import com.intelli.rfid.spring.TagBroadcaster;
 import com.intelli.rfid.wayside.ClockSync;
 import com.intelli.rfid.wayside.WaysideProperties;
 import com.intelli.rfid.wayside.cloud.CloudSender;
+import com.intelli.rfid.wayside.trigger.GpioTrigger;
 import com.intelli.rfid.wayside.wheel.WheelSource;
 import java.io.UncheckedIOException;
 import java.time.Clock;
@@ -44,6 +45,9 @@ public class PassService {
     private final CloudSender cloud;
     private final ClockSync clockSync;
     private final CarrierController carrier;
+    /** Non-null in GPIO trigger mode: J26 IN1/IN2 bound the passes, not the wheels. */
+    private final GpioTrigger gpio;
+    private volatile boolean triggerUp;
     private final PassTracker tracker;
     private final JsonlSpool<PassResult> spool;
     private final String spoolProblem;
@@ -59,13 +63,15 @@ public class PassService {
     });
 
     public PassService(WaysideProperties properties, ReaderService reader, WheelSource wheels,
-                       CloudSender cloud, ClockSync clockSync, ObjectMapper mapper) {
+                       GpioTrigger gpio, CloudSender cloud, ClockSync clockSync, ObjectMapper mapper) {
         this.properties = properties;
         this.reader = reader;
         this.wheels = wheels;
+        this.gpio = gpio;
         this.cloud = cloud;
         this.clockSync = clockSync;
-        this.carrier = new CarrierController(reader, properties.getRfid().getCarrier(), wheels::isUp);
+        this.carrier = new CarrierController(reader, properties.getRfid().getCarrier(),
+                gpio != null ? gpio::isWatching : wheels::isUp);
 
         JsonlSpool<PassResult> opened;
         String problem = null;
@@ -107,16 +113,27 @@ public class PassService {
                     + "identity. Set it per unit in the site config.");
         }
         reader.subscribe(reads -> executor.execute(() -> tracker.onTags(reads)));
-        wheels.start(event -> executor.execute(() -> tracker.onWheel(event)));
+        if (gpio != null) {
+            gpio.start(nanos -> executor.execute(() -> tracker.onTrainStart(nanos)),
+                    nanos -> executor.execute(() -> tracker.onTrainEnd(nanos)));
+            // The SAMD21 link still runs, for /api/v1/wheel/levels, but it does not bound passes.
+            wheels.start(event -> {});
+        } else {
+            wheels.start(event -> executor.execute(() -> tracker.onWheel(event)));
+        }
         executor.scheduleWithFixedDelay(this::tickQuietly, 100, 100, TimeUnit.MILLISECONDS);
         carrier.start();
-        log.info("Wayside pass tracking started: wheel source {}, carrier {}, decode {}",
-                properties.getWheel().getSource(), properties.getRfid().getCarrier(),
+        log.info("Wayside pass tracking started: trigger {}, wheel source {}, carrier {}, decode {}",
+                properties.getTrigger().getSource(), properties.getWheel().getSource(),
+                properties.getRfid().getCarrier(),
                 properties.getTrain().getDecode());
     }
 
     public void stop() {
         carrier.stop();
+        if (gpio != null) {
+            gpio.close();
+        }
         wheels.stop();
         executor.shutdownNow();
         events.shutdown();
@@ -124,6 +141,10 @@ public class PassService {
 
     private void tickQuietly() {
         try {
+            if (gpio != null && gpio.isWatching() != triggerUp) {
+                triggerUp = gpio.isWatching();
+                tracker.onTriggerHealth(triggerUp);
+            }
             tracker.tick();
         } catch (RuntimeException e) {
             log.error("Pass tick failed", e);
@@ -206,6 +227,19 @@ public class PassService {
 
     public SseEmitter subscribeEvents() {
         return events.subscribe();
+    }
+
+    /** Bench: a train start or end as though J26 had seen it. False outside GPIO mode. */
+    public boolean injectTrigger(boolean start) {
+        return gpio != null && gpio.inject(start);
+    }
+
+    /** Null outside GPIO mode; "WATCHING" or the problem otherwise. */
+    public String triggerState() {
+        if (gpio == null) {
+            return null;
+        }
+        return gpio.isWatching() ? "WATCHING" : String.valueOf(gpio.problem());
     }
 
     public PassTracker.State state() {

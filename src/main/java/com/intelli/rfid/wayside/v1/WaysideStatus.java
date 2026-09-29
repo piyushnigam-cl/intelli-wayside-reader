@@ -11,6 +11,8 @@ public record WaysideStatus(
         boolean carrierWanted,
         String carrierMode,
         String pass,
+        String trigger,
+        String triggerState,
         boolean clockSynced,
         long currentSequence,
         Instant lastPassAt,

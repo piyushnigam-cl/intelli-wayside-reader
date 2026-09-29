@@ -95,6 +95,20 @@ wayside:
   spool-dir: /var/lib/intelli/wayside/spool
   spool-enabled: true
 
+  trigger:
+    # What bounds a pass. WHEELS = the Frauscher sensors via the SAMD21 (the design).
+    # GPIO = J26 IN1 starts a train, IN2 ends it: a stand-in until the sensors are fitted, with no
+    # axles, direction or speed (operator, 2026-09-29). Either way, if the trigger itself is down a
+    # pass falls back to RFID-only.
+    source: WHEELS
+    gpio:
+      start-line: 23         # J26 IN1
+      end-line: 24           # J26 IN2
+      # 24 V at J26 pulls the pin LOW through the opto; -l makes "rising" mean "asserted".
+      active-low: true
+      debounce-ms: 50
+      libgpiod-major: 0      # 0 = detect (v2 on Trixie)
+
   wheel:
     # SERIAL = the SAMD21 on UART3. NO SAMD21 FIRMWARE EXISTS YET, so on a board today the link
     # stays DOWN and every pass is RFID-only (degraded), which is the designed fallback.

@@ -7,6 +7,16 @@ import org.junit.jupiter.api.Test;
 /** Cases are real tags from the intellisbc2 bench, 2026-09-29, plus the GS1 and ISO shapes. */
 class EpcEncodingTest {
 
+    /** A 4-byte TID is the model header every tag of the model shares: it must never target a write. */
+    @Test
+    void aHeaderOnlyTidIsRefusedBeforeTheReaderIsTouched() {
+        TagToolService service = new TagToolService(null, null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.write("E2C06892", "8A8020013A1D00021F0C5233"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("model header");
+    }
+
     @Test
     void theCharkopBenchTagsArePrivate() {
         assertThat(EpcEncoding.describe("8A8020013A1D00021F0C5233", "3000", "E2C06892200009021F0C5233"))

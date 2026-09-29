@@ -52,6 +52,14 @@ public class TagToolService {
     /** 96-bit TID (Impinj, NXP): 6 blocks. Fallback for a chip with only the 32-bit class header. */
     private static final int TID_BLOCKS = 6;
     private static final int TID_BLOCKS_SHORT = 2;
+    private static final int TID_ATTEMPTS = 3;
+    /**
+     * A write needs a TID that names ONE chip: at least 8 bytes, i.e. past the 4-byte class, maker
+     * and model header, which every tag of that model shares. A header-only TID as a Select filter
+     * would write to whichever tag of that model answered first. Found 2026-09-29, when a marginal
+     * full read fell back to the header and the page offered a write on it.
+     */
+    static final int MIN_WRITE_TID_HEX = 16;
 
     public record ScannedTag(String epc, String tid, String pc, String encoding, int bestRssiDbm,
                              int reads, String error) {}
@@ -89,6 +97,10 @@ public class TagToolService {
                     ops.withFilter(MemoryBank.EPC, 32, e.getKey(), false);
                     tid = readTid(ops, antenna);
                     pc = readPc(ops, antenna);
+                    if (tid.length() < MIN_WRITE_TID_HEX) {
+                        error = "Only the TID's model header was read; it does not single out this "
+                                + "tag, so writing is disabled. Move the tag closer and read again.";
+                    }
                 } catch (ReaderException ex) {
                     error = (tid == null ? "TID" : "PC") + " not read: " + ex.getMessage();
                 } finally {
@@ -108,6 +120,11 @@ public class TagToolService {
         if (epc.length() % 4 != 0 || epc.isEmpty() || epc.length() > 60) {
             throw new IllegalArgumentException("EPC must be 1 to 15 whole 16-bit words: a multiple of "
                     + "4 hex digits, up to 60. Got " + epc.length() + " digits.");
+        }
+        if (t.length() < MIN_WRITE_TID_HEX) {
+            throw new IllegalArgumentException("TID " + t + " is only " + t.length() / 2 + " bytes: "
+                    + "that is the chip model header, shared by every tag of the model, so it cannot "
+                    + "target one tag. A full TID (12 bytes on these chips) is needed.");
         }
         requireNoTrain();
         return reader.whilePaused(() -> inSession0(() -> {
@@ -170,12 +187,22 @@ public class TagToolService {
         return ops.readBank(antenna, MemoryBank.EPC, 1, 1, null, OP_TIMEOUT_MS);
     }
 
+    /**
+     * The full TID, retried: a tag at the edge of the field answers some reads and not others. Only
+     * when every full read fails is the 4-byte header tried, and the caller then refuses to write.
+     */
     private String readTid(TagOperations ops, int antenna) {
-        try {
-            return ops.readBank(antenna, MemoryBank.TID, 0, TID_BLOCKS, null, OP_TIMEOUT_MS);
-        } catch (ReaderException full) {
-            return ops.readBank(antenna, MemoryBank.TID, 0, TID_BLOCKS_SHORT, null, OP_TIMEOUT_MS);
+        ReaderException last = null;
+        for (int attempt = 0; attempt < TID_ATTEMPTS; attempt++) {
+            try {
+                return ops.readBank(antenna, MemoryBank.TID, 0, TID_BLOCKS, null, OP_TIMEOUT_MS);
+            } catch (ReaderException e) {
+                last = e;
+            }
         }
+        log.debug("Full TID read failed {} times ({}); trying the header only", TID_ATTEMPTS,
+                last.getMessage());
+        return ops.readBank(antenna, MemoryBank.TID, 0, TID_BLOCKS_SHORT, null, OP_TIMEOUT_MS);
     }
 
     private void requireNoTrain() {

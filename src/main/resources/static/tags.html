@@ -178,9 +178,13 @@
       const result = cell(tr, "result");
       if (t.error) { result.textContent = t.error; result.className = "result bad"; }
       else if (counts[t.epc] > 1) { result.textContent = "Duplicate EPC"; result.className = "result warn"; }
-      if (!t.tid) {
+      // A write is aimed at the TID, so it needs one that names a single chip: past the 4-byte
+      // model header every tag of that model shares. The server refuses it too.
+      if (!t.tid || t.tid.length < 16) {
         epc.readOnly = true;
-        result.textContent = result.textContent || "No TID: cannot target a write";
+        result.className = "result bad";
+        result.textContent = t.tid ? "Partial TID: cannot target a write. Move the tag closer and Read again."
+                                   : (result.textContent || "No TID: cannot target a write");
       }
 
       epc.addEventListener("input", () => {

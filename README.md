@@ -64,6 +64,11 @@ Measured 2026-09-29 on `intellisbc2`: 8/8 axles at both heads, `DOWN`, 45.0 km/h
 
 ## Deploy (wayside boards only)
 
+**Deployed 2026-09-29 on `intellisbc2`**, the wayside development board (its tunnel is disabled). It
+came up healthy: the module opened on fw 20.26.08.19 under `RG_IN`, and the triggered carrier dropped
+0.8 s after connect. The wheel link is UP to the SAMD21 running `intelli-wayside-reader-mcu`, with
+all four loops OPEN (no sensors fitted). Requests without a key get 401.
+
 **It cannot run beside the tunnel.** Both apps own `/dev/ttyAMA0` and the JNI library. The unit
 declares `Conflicts=intelli-rfid-tunnel.service`, and `redeploy.sh` refuses to run on a board whose
 tunnel is enabled.

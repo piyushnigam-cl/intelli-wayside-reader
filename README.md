@@ -14,7 +14,9 @@ fixed in `AxleBuilder` and not configurable. In each RSR110d the element on pin 
 Wheel 1 side, or every pass reads `UNKNOWN`. Two distances, measured on site:
 `wayside.wheel.element-spacing-m` (between one sensor's two elements, one value for both; gives
 `speedAtWheel1Kmh` / `speedAtWheel2Kmh` per axle) and `wayside.wheel.sensor-spacing-m` (Wheel 1 to
-Wheel 2). The old names `system-spacing-m` / `head-spacing-m` still bind. The pass JSON keeps
+Wheel 2; 0 = the sum of `wheel1-to-wpms-m` + `wpms-length-m` + `wpms-to-wheel2-m`). The old names
+`system-spacing-m` / `head-spacing-m` still bind. Packaged starting values, to fine-tune on site:
+element spacing 0.06 m, Wheel 1 → WPMS 13 m, WPMS 3.5 m, WPMS → Wheel 2 18.5 m. The pass JSON keeps
 `headA`/`atA` = Wheel 2 and `headB`/`atB` = Wheel 1.
 
 ## State (2026-09-29)

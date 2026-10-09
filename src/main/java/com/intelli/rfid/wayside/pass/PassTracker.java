@@ -125,7 +125,7 @@ public class PassTracker {
         this.gpioTrigger = properties.getTrigger().getSource() == WaysideProperties.TriggerSource.GPIO;
         this.in1IsUp = properties.getTrigger().getGpio().isIn1IsUp();
         WaysideProperties.Wheel wheel = properties.getWheel();
-        this.axleConfig = new AxleBuilder.Config(wheel.getSensorSpacingM(),
+        this.axleConfig = new AxleBuilder.Config(wheel.effectiveSensorSpacingM(),
                 wheel.getElementSpacingM(), TimeUnit.MILLISECONDS.toMicros(wheel.getSystemPairMaxMs()));
         this.tagsExpected = properties.getTrain().getTagsExpected();
         this.decoder = decoder;

@@ -132,9 +132,19 @@ public class WaysideProperties {
          * ignored.
          */
 
+        /*
+         * The site layout along the rail, measured on site (operator, 2026-10-09):
+         *
+         *   Wheel 1 --wheel1-to-wpms-m-- [ WPMS, wpms-length-m ] --wpms-to-wheel2-m-- Wheel 2
+         */
+        private double wheel1ToWpmsM = 0;
+        private double wpmsLengthM = 0;
+        private double wpmsToWheel2M = 0;
+
         /**
-         * Rail distance between Wheel 1 and Wheel 2, measured on site. 0 = no sensor-to-sensor
-         * speed. Was {@code head-spacing-m}, which is still accepted.
+         * Rail distance between Wheel 1 and Wheel 2. 0 (the default) = the sum of the three layout
+         * distances above; a non-zero value overrides that sum. Was {@code head-spacing-m}, which is
+         * still accepted.
          */
         private double sensorSpacingM = 0;
 
@@ -163,6 +173,25 @@ public class WaysideProperties {
         public int getBaud() { return baud; }
         public void setBaud(int baud) { this.baud = baud; }
         public double getSensorSpacingM() { return sensorSpacingM; }
+        public double getWheel1ToWpmsM() { return wheel1ToWpmsM; }
+        public void setWheel1ToWpmsM(double wheel1ToWpmsM) { this.wheel1ToWpmsM = wheel1ToWpmsM; }
+        public double getWpmsLengthM() { return wpmsLengthM; }
+        public void setWpmsLengthM(double wpmsLengthM) { this.wpmsLengthM = wpmsLengthM; }
+        public double getWpmsToWheel2M() { return wpmsToWheel2M; }
+        public void setWpmsToWheel2M(double wpmsToWheel2M) { this.wpmsToWheel2M = wpmsToWheel2M; }
+
+        /**
+         * The Wheel 1 to Wheel 2 distance the speed is computed from: {@code sensor-spacing-m} if
+         * set, otherwise the three layout distances added up, otherwise 0 (no such speed). A layout
+         * with any part missing gives 0 rather than a short sum.
+         */
+        public double effectiveSensorSpacingM() {
+            if (sensorSpacingM > 0) {
+                return sensorSpacingM;
+            }
+            boolean complete = wheel1ToWpmsM > 0 && wpmsLengthM > 0 && wpmsToWheel2M > 0;
+            return complete ? wheel1ToWpmsM + wpmsLengthM + wpmsToWheel2M : 0;
+        }
         public void setSensorSpacingM(double sensorSpacingM) { this.sensorSpacingM = sensorSpacingM; }
         public double getElementSpacingM() { return elementSpacingM; }
         public void setElementSpacingM(double elementSpacingM) { this.elementSpacingM = elementSpacingM; }

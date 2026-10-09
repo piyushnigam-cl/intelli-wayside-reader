@@ -109,11 +109,17 @@ public class BenchController {
                 "pass", passes.state().name()));
     }
 
-    /** The configured geometry where set, otherwise a plausible 20 m layout. */
+    /**
+     * The configured geometry where set, otherwise a plausible 20 m layout. The antenna is placed
+     * at the middle of the WPMS when the layout is configured, else halfway between the sensors.
+     */
     private SimulatedTrain.Geometry geometry() {
         WaysideProperties.Wheel wheel = properties.getWheel();
-        double heads = wheel.getSensorSpacingM() > 0 ? wheel.getSensorSpacingM() : 20.0;
+        double configured = wheel.effectiveSensorSpacingM();
+        double heads = configured > 0 ? configured : 20.0;
         double systems = wheel.getElementSpacingM() > 0 ? wheel.getElementSpacingM() : 0.14;
-        return new SimulatedTrain.Geometry(heads, heads / 2, systems, 0.1, 5.0);
+        double antenna = wheel.getWheel1ToWpmsM() > 0 && wheel.getWheel1ToWpmsM() < heads
+                ? wheel.getWheel1ToWpmsM() + wheel.getWpmsLengthM() / 2 : heads / 2;
+        return new SimulatedTrain.Geometry(heads, antenna, systems, 0.1, 5.0);
     }
 }

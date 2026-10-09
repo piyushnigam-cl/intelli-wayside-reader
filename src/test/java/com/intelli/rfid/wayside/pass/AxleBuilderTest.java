@@ -132,4 +132,18 @@ class AxleBuilderTest {
         assertThat(wheel.getSensorSpacingM()).isEqualTo(18.5);
         assertThat(wheel.getElementSpacingM()).isEqualTo(0.12);
     }
+
+    /** Operator, 2026-10-09: Wheel 1 --13 m-- WPMS 3.5 m --18.5 m-- Wheel 2. */
+    @Test
+    void theSensorSpacingIsTheLayoutAddedUpUnlessSetOutright() {
+        WaysideProperties.Wheel wheel = new WaysideProperties.Wheel();
+        assertThat(wheel.effectiveSensorSpacingM()).isZero();
+        wheel.setWheel1ToWpmsM(13.0);
+        wheel.setWpmsLengthM(3.5);
+        assertThat(wheel.effectiveSensorSpacingM()).as("a partial layout gives no speed").isZero();
+        wheel.setWpmsToWheel2M(18.5);
+        assertThat(wheel.effectiveSensorSpacingM()).isEqualTo(35.0);
+        wheel.setSensorSpacingM(34.8);
+        assertThat(wheel.effectiveSensorSpacingM()).isEqualTo(34.8);
+    }
 }

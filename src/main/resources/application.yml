@@ -126,11 +126,18 @@ wayside:
     baud: 115200
     # Direction is fixed, not configured: Wheel 1 (J23) first = UP, Wheel 2 (J22) first = DOWN.
     # Prove the wiring with a train of known direction.
-    # Rail distance Wheel 1 -> Wheel 2, measured on site. 0 = no sensor-to-sensor speed.
+    # Layout along the rail. STARTING VALUES from the operator (2026-10-09), to be fine-tuned by
+    # the team on site with a tape:
+    #   Wheel 1 --13 m-- [ WPMS 3.5 m ] --18.5 m-- Wheel 2
+    wheel1-to-wpms-m: 13.0
+    wpms-length-m: 3.5
+    wpms-to-wheel2-m: 18.5
+    # Wheel 1 -> Wheel 2 for the sensor-to-sensor speed. 0 = the three distances above added up
+    # (35 m with the starting values); a non-zero value overrides the sum.
     sensor-spacing-m: 0
-    # Between the two sensing elements of one RSR110d, measured on site (one value for both
-    # sensors). 0 = no speed at each sensor.
-    element-spacing-m: 0
+    # Between the two sensing elements of one RSR110d (one value for both sensors). Starting value
+    # 6 cm, to be confirmed on site. 0 = no speed at each sensor.
+    element-spacing-m: 0.06
     system-pair-max-ms: 2000
     link-timeout-ms: 3000
     # UNVERIFIED and deliberately zero: the serial link refuses to start until all three are set.

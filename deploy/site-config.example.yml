@@ -16,8 +16,11 @@ wayside:
   reader-id: charkop-01
   wheel:
     # Stays SERIAL. Until the SAMD21 firmware exists the link is DOWN and passes are RFID-only.
-    sensor-spacing-m: 0        # Wheel 1 to Wheel 2, measured rail to rail on site
-    element-spacing-m: 0       # between the two sensing elements of one RSR110d, measured on site
+    # Measured on site; the packaged starting values are 13 / 3.5 / 18.5 m and 0.06 m.
+    wheel1-to-wpms-m: 13.0
+    wpms-length-m: 3.5
+    wpms-to-wheel2-m: 18.5
+    element-spacing-m: 0.06    # between the two sensing elements of one RSR110d
     detect:                    # from the sensor datasheet, then a capture
       covered-ua: 0
       uncovered-ua: 0

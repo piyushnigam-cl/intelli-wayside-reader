@@ -1,5 +1,6 @@
 package com.intelli.rfid.wayside.pass;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.intelli.rfid.wayside.wheel.WheelEvent;
 import com.intelli.rfid.wayside.wheel.WheelEvent.Pulse;
 import java.time.Instant;
@@ -10,72 +11,99 @@ import java.util.List;
 import java.util.function.LongFunction;
 
 /**
- * Pairs each head's two systems into axles and derives direction, speed and the per-head counts
- * (design sec.5.3). Pure: a list of pulses in, one {@link Analysis} out.
+ * Pairs each wheel sensor's two elements into axles and derives direction, speed and the
+ * per-sensor counts (design sec.5.3). Pure: a list of pulses in, one {@link Analysis} out.
  *
- * <p>Channels are numbered in the A→B direction along the rail (see {@link WheelEvent}), so at a
- * head, system 1 before system 2 means the wheel was travelling A→B.
+ * <p><b>Wheel 1 (J23) seeing the train first is UP, Wheel 2 (J22) first is DOWN</b> (operator,
+ * 2026-10-09). Not configurable. Three witnesses must agree before a direction is named: which
+ * sensor the first axle reached first, and the element order at each sensor (see
+ * {@link WheelEvent} for the installation rule that makes element order mean anything).
  */
 public final class AxleBuilder {
 
     /**
-     * @param upIsAToB        whether A→B is UP
-     * @param headSpacingM    rail distance head A → head B; 0 = no head-to-head speed
-     * @param systemSpacingM  distance between a head's two systems; 0 = no single-head fallback
-     * @param systemPairMaxUs longest gap between a head's two systems seeing one wheel
+     * @param sensorSpacingM  rail distance Wheel 1 → Wheel 2; 0 = no sensor-to-sensor speed
+     * @param elementSpacingM distance between one sensor's two elements; 0 = no per-sensor speed
+     * @param systemPairMaxUs longest gap between one sensor's two elements seeing one wheel
      */
-    public record Config(boolean upIsAToB, double headSpacingM, double systemSpacingM,
-                         long systemPairMaxUs) {}
+    public record Config(double sensorSpacingM, double elementSpacingM, long systemPairMaxUs) {}
 
-    /** One axle as the pass result reports it. Nulls where a head did not see it. */
-    public record Axle(int n, Instant atA, Instant atB, Double speedKmh, List<Integer> peakUa) {}
+    /**
+     * One axle as the pass result reports it. Nulls where a sensor did not see it, or where the
+     * distance a speed needs is not configured.
+     *
+     * <p>{@code atA}/{@code atB} keep their schema-1 names: A is Wheel 2 (J22), B is Wheel 1 (J23).
+     * {@code speedKmh} is the sensor-to-sensor speed, or, when that cannot be had, the mean of the
+     * speeds at the two sensors. {@code peakUa} is in channel order: Wheel 2 elements 1 and 2, then
+     * Wheel 1 elements 1 and 2.
+     */
+    public record Axle(int n,
+                       @JsonProperty("atA") Instant atWheel2,
+                       @JsonProperty("atB") Instant atWheel1,
+                       Double speedKmh, Double speedAtWheel1Kmh, Double speedAtWheel2Kmh,
+                       List<Integer> peakUa) {}
 
-    public record Analysis(Direction direction, int headA, int headB, boolean consistent,
+    public record Analysis(Direction direction, int wheel1, int wheel2, boolean consistent,
                            Double speedMin, Double speedMean, Double speedMax, List<Axle> axles,
                            List<String> notes) {}
 
-    /** One wheel seen by both systems of one head. */
-    record HeadAxle(long centreTick, long centreNanos, boolean aToB, long systemGapTicks,
-                    int peak1, int peak2) {}
+    /**
+     * One wheel seen by both elements of one sensor. {@code up} is the element order: element 2
+     * (the Wheel 1 side) before element 1.
+     */
+    record SensorAxle(long centreTick, long centreNanos, boolean up, long systemGapTicks,
+                      int peak1, int peak2) {}
+
+    private static final int WHEEL_2 = 0;
+    private static final int WHEEL_1 = 1;
 
     private AxleBuilder() {}
 
     public static Analysis analyse(List<Pulse> pulses, Config config, LongFunction<Instant> wall) {
         List<String> notes = new ArrayList<>();
-        List<HeadAxle> a = pair(pulses, 0, config, notes);
-        List<HeadAxle> b = pair(pulses, 1, config, notes);
-        boolean consistent = a.size() == b.size();
-        Direction direction = direction(a, b, config, notes);
+        List<SensorAxle> w1 = pair(pulses, WHEEL_1, config, notes);
+        List<SensorAxle> w2 = pair(pulses, WHEEL_2, config, notes);
+        boolean consistent = w1.size() == w2.size();
+        Direction direction = direction(w1, w2, notes);
 
-        int n = Math.max(a.size(), b.size());
+        int n = Math.max(w1.size(), w2.size());
         List<Axle> axles = new ArrayList<>(n);
         List<Double> speeds = new ArrayList<>();
         for (int i = 0; i < n; i++) {
-            HeadAxle atA = i < a.size() ? a.get(i) : null;
-            HeadAxle atB = i < b.size() ? b.get(i) : null;
-            Double speed = speed(atA, atB, a, b, direction, consistent, config);
+            SensorAxle at1 = i < w1.size() ? w1.get(i) : null;
+            SensorAxle at2 = i < w2.size() ? w2.get(i) : null;
+            Double between = betweenSensors(at1, at2, direction, consistent, config);
+            Double atWheel1 = atSensor(at1, config);
+            Double atWheel2 = atSensor(at2, config);
+            Double speed = between != null ? between : mean(atWheel1, atWheel2);
             if (speed != null) {
                 speeds.add(speed);
             }
             axles.add(new Axle(i + 1,
-                    atA == null ? null : wall.apply(atA.centreNanos()),
-                    atB == null ? null : wall.apply(atB.centreNanos()),
-                    speed == null ? null : round1(speed),
-                    Arrays.asList(atA == null ? null : atA.peak1(), atA == null ? null : atA.peak2(),
-                            atB == null ? null : atB.peak1(), atB == null ? null : atB.peak2())));
+                    at2 == null ? null : wall.apply(at2.centreNanos()),
+                    at1 == null ? null : wall.apply(at1.centreNanos()),
+                    round1(speed), round1(atWheel1), round1(atWheel2),
+                    Arrays.asList(at2 == null ? null : at2.peak1(), at2 == null ? null : at2.peak2(),
+                            at1 == null ? null : at1.peak1(), at1 == null ? null : at1.peak2())));
         }
         if (!consistent) {
-            notes.add("axle count disagrees between heads: A " + a.size() + ", B " + b.size());
+            notes.add("axle count disagrees between sensors: Wheel 1 " + w1.size() + ", Wheel 2 "
+                    + w2.size());
         }
-        Double min = speeds.stream().min(Double::compare).map(AxleBuilder::round1).orElse(null);
-        Double max = speeds.stream().max(Double::compare).map(AxleBuilder::round1).orElse(null);
-        Double mean = speeds.isEmpty() ? null
+        Double min = round1(speeds.stream().min(Double::compare).orElse(null));
+        Double max = round1(speeds.stream().max(Double::compare).orElse(null));
+        Double avg = speeds.isEmpty() ? null
                 : round1(speeds.stream().mapToDouble(Double::doubleValue).average().orElse(0));
-        return new Analysis(direction, a.size(), b.size(), consistent, min, mean, max, axles, notes);
+        return new Analysis(direction, w1.size(), w2.size(), consistent, min, avg, max, axles, notes);
     }
 
-    /** Greedy, in time order: each pulse takes the first later pulse on the other system in range. */
-    static List<HeadAxle> pair(List<Pulse> pulses, int head, Config config, List<String> notes) {
+    /**
+     * Mutual nearest neighbours: a pulse pairs with the closest pulse on the sensor's other element,
+     * within {@code systemPairMaxUs}, only if that pulse's closest is this one. A greedy pairing in
+     * time order would join a wheel whose partner was missed to the next axle's pulse, and the
+     * speed at that sensor would be confidently wrong.
+     */
+    static List<SensorAxle> pair(List<Pulse> pulses, int head, Config config, List<String> notes) {
         List<Pulse> mine = new ArrayList<>();
         for (Pulse p : pulses) {
             if (WheelEvent.head(p.channel()) == head) {
@@ -83,99 +111,127 @@ public final class AxleBuilder {
             }
         }
         mine.sort(Comparator.comparingLong(Pulse::centreTick));
-        boolean[] used = new boolean[mine.size()];
-        List<HeadAxle> axles = new ArrayList<>();
+        int[] nearest = new int[mine.size()];
+        for (int i = 0; i < mine.size(); i++) {
+            nearest[i] = nearestPartner(mine, i, config.systemPairMaxUs());
+        }
+        List<SensorAxle> axles = new ArrayList<>();
         int orphans = 0;
         for (int i = 0; i < mine.size(); i++) {
-            if (used[i]) {
-                continue;
-            }
-            Pulse p = mine.get(i);
-            int match = -1;
-            for (int j = i + 1; j < mine.size(); j++) {
-                Pulse q = mine.get(j);
-                if (q.centreTick() - p.centreTick() > config.systemPairMaxUs()) {
-                    break;
-                }
-                if (!used[j] && WheelEvent.system(q.channel()) != WheelEvent.system(p.channel())) {
-                    match = j;
-                    break;
-                }
-            }
-            if (match < 0) {
+            int j = nearest[i];
+            if (j < 0 || nearest[j] != i) {
                 orphans++;
                 continue;
             }
-            used[i] = true;
-            used[match] = true;
-            Pulse q = mine.get(match);
-            Pulse first = WheelEvent.system(p.channel()) == 0 ? p : q;
-            Pulse second = first == p ? q : p;
-            boolean aToB = WheelEvent.system(p.channel()) == 0;
+            if (j < i) {
+                continue;   // already added from the earlier pulse
+            }
+            Pulse p = mine.get(i);
+            Pulse q = mine.get(j);
+            Pulse element1 = WheelEvent.system(p.channel()) == 0 ? p : q;
+            Pulse element2 = element1 == p ? q : p;
+            boolean up = WheelEvent.system(p.channel()) == 1;
             long centreNanos = ((p.onNanos() + p.offNanos()) / 2 + (q.onNanos() + q.offNanos()) / 2) / 2;
-            axles.add(new HeadAxle((p.centreTick() + q.centreTick()) / 2, centreNanos, aToB,
-                    q.centreTick() - p.centreTick(), first.peakUa(), second.peakUa()));
+            axles.add(new SensorAxle((p.centreTick() + q.centreTick()) / 2, centreNanos, up,
+                    q.centreTick() - p.centreTick(), element1.peakUa(), element2.peakUa()));
         }
         if (orphans > 0) {
-            notes.add("head " + (head == 0 ? "A" : "B") + ": " + orphans
-                    + " pulse(s) with no partner on the other system");
+            notes.add(name(head) + ": " + orphans + " pulse(s) with no partner on the other element");
         }
         return axles;
     }
 
-    static Direction direction(List<HeadAxle> a, List<HeadAxle> b, Config config, List<String> notes) {
-        Boolean dirA = uniform(a);
-        Boolean dirB = uniform(b);
-        if ((!a.isEmpty() && dirA == null) || (!b.isEmpty() && dirB == null)) {
+    /** Index of the closest pulse on the other element within {@code maxUs}, or -1. */
+    private static int nearestPartner(List<Pulse> mine, int i, long maxUs) {
+        Pulse p = mine.get(i);
+        int best = -1;
+        long bestGap = Long.MAX_VALUE;
+        for (int j = 0; j < mine.size(); j++) {
+            Pulse q = mine.get(j);
+            if (WheelEvent.system(q.channel()) == WheelEvent.system(p.channel())) {
+                continue;
+            }
+            long gap = Math.abs(q.centreTick() - p.centreTick());
+            if (gap <= maxUs && gap < bestGap) {
+                best = j;
+                bestGap = gap;
+            }
+        }
+        return best;
+    }
+
+    static Direction direction(List<SensorAxle> w1, List<SensorAxle> w2, List<String> notes) {
+        Boolean up1 = uniform(w1);
+        Boolean up2 = uniform(w2);
+        if ((!w1.isEmpty() && up1 == null) || (!w2.isEmpty() && up2 == null)) {
             return Direction.MIXED;
         }
-        if (a.isEmpty() || b.isEmpty()) {
-            if (!(a.isEmpty() && b.isEmpty())) {
-                notes.add("only head " + (a.isEmpty() ? "B" : "A") + " saw the train; direction "
-                        + "needs both");
+        if (w1.isEmpty() || w2.isEmpty()) {
+            if (!(w1.isEmpty() && w2.isEmpty())) {
+                notes.add("only " + (w1.isEmpty() ? "Wheel 2" : "Wheel 1") + " saw the train; "
+                        + "direction needs both");
             }
             return Direction.UNKNOWN;
         }
-        if (!dirA.equals(dirB)) {
-            notes.add("heads disagree on direction");
+        if (!up1.equals(up2)) {
+            notes.add("the two sensors disagree on element order");
             return Direction.UNKNOWN;
         }
-        // Third, independent witness: which head the first axle reached first.
-        boolean headOrderAToB = a.get(0).centreTick() < b.get(0).centreTick();
-        if (headOrderAToB != dirA) {
-            notes.add("head order contradicts the system order at both heads");
+        // The operator's definition: which sensor the first axle reached first.
+        boolean wheel1First = w1.get(0).centreTick() < w2.get(0).centreTick();
+        if (wheel1First != up1) {
+            notes.add("sensor order contradicts the element order at both sensors; check which "
+                    + "element is on pin 2 and which on pin 4");
             return Direction.UNKNOWN;
         }
-        return dirA == config.upIsAToB() ? Direction.UP : Direction.DOWN;
+        return wheel1First ? Direction.UP : Direction.DOWN;
     }
 
-    /** true = all A→B, false = all B→A, null = both seen. Empty is true, and callers check. */
-    private static Boolean uniform(List<HeadAxle> axles) {
-        boolean anyAToB = axles.stream().anyMatch(HeadAxle::aToB);
-        boolean anyBToA = axles.stream().anyMatch(x -> !x.aToB());
-        if (anyAToB && anyBToA) {
+    /** true = all UP order, false = all DOWN order, null = both seen. Empty is true; callers check. */
+    private static Boolean uniform(List<SensorAxle> axles) {
+        boolean anyUp = axles.stream().anyMatch(SensorAxle::up);
+        boolean anyDown = axles.stream().anyMatch(x -> !x.up());
+        if (anyUp && anyDown) {
             return null;
         }
-        return !anyBToA;
+        return !anyDown;
     }
 
-    private static Double speed(HeadAxle atA, HeadAxle atB, List<HeadAxle> a, List<HeadAxle> b,
-                                Direction direction, boolean consistent, Config config) {
+    /** Wheel 1 to Wheel 2 for the same axle; only when the counts agree and the direction is known. */
+    private static Double betweenSensors(SensorAxle at1, SensorAxle at2, Direction direction,
+                                         boolean consistent, Config config) {
         boolean known = direction == Direction.UP || direction == Direction.DOWN;
-        if (config.headSpacingM() > 0 && consistent && known && atA != null && atB != null) {
-            long dt = Math.abs(atB.centreTick() - atA.centreTick());
-            return dt == 0 ? null : config.headSpacingM() / (dt / 1e6) * 3.6;
+        if (config.sensorSpacingM() <= 0 || !consistent || !known || at1 == null || at2 == null) {
+            return null;
         }
-        // Coarse fallback, only when one head is down (design sec.5.3).
-        boolean oneHead = a.isEmpty() != b.isEmpty();
-        HeadAxle only = atA != null ? atA : atB;
-        if (config.systemSpacingM() > 0 && oneHead && only != null && only.systemGapTicks() > 0) {
-            return config.systemSpacingM() / (only.systemGapTicks() / 1e6) * 3.6;
-        }
-        return null;
+        long dt = Math.abs(at2.centreTick() - at1.centreTick());
+        return dt == 0 ? null : kmh(config.sensorSpacingM(), dt);
     }
 
-    private static double round1(double v) {
-        return Math.round(v * 10) / 10.0;
+    /** Element spacing over the time between that sensor's two elements seeing the wheel. */
+    private static Double atSensor(SensorAxle at, Config config) {
+        if (config.elementSpacingM() <= 0 || at == null || at.systemGapTicks() <= 0) {
+            return null;
+        }
+        return kmh(config.elementSpacingM(), at.systemGapTicks());
+    }
+
+    private static double kmh(double metres, long micros) {
+        return metres / (micros / 1e6) * 3.6;
+    }
+
+    private static Double mean(Double a, Double b) {
+        if (a == null) {
+            return b;
+        }
+        return b == null ? a : (a + b) / 2;
+    }
+
+    private static String name(int head) {
+        return head == WHEEL_1 ? "Wheel 1" : "Wheel 2";
+    }
+
+    private static Double round1(Double v) {
+        return v == null ? null : Math.round(v * 10) / 10.0;
     }
 }

@@ -58,8 +58,10 @@ public record PassResult(
     public record Wheels(String link, Direction direction, AxleCount axleCount, Speed speedKmh,
                          List<AxleBuilder.Axle> axles, List<String> faults) {}
 
+    /** The schema-1 names: headA is Wheel 2 (J22), headB is Wheel 1 (J23). */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record AxleCount(int headA, int headB, boolean consistent) {}
+    public record AxleCount(@JsonProperty("headA") int wheel2, @JsonProperty("headB") int wheel1,
+                            boolean consistent) {}
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Speed(Double min, Double mean, Double max) {}

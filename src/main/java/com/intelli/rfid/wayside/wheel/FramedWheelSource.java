@@ -250,7 +250,7 @@ public abstract class FramedWheelSource implements WheelSource {
     public synchronized WheelLinkStatus status() {
         List<WheelLinkStatus.Channel> channels = new ArrayList<>();
         for (int i = 0; i < WheelMessages.CHANNELS; i++) {
-            channels.add(new WheelLinkStatus.Channel(i, i < 2 ? "A" : "B", i % 2 + 1,
+            channels.add(new WheelLinkStatus.Channel(i, "Wheel " + WheelEvent.wheel(i), i % 2 + 1,
                     meanKnown[i] ? meanUa[i] : null, covered[i], faults[i].name()));
         }
         long last = lastFrameNanos;

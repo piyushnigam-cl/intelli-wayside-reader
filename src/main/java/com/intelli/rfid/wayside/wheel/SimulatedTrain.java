@@ -10,11 +10,13 @@ import java.util.List;
  *
  * <pre>
  *   x = 0          x = antennaM             x = headSpacingM
- *   head A  ...... antenna ................ head B        UP travels +x
+ *   Wheel 1 ...... antenna ................ Wheel 2       UP travels +x (Wheel 1 first)
+ *   (J23, ch 2/3)                           (J22, ch 0/1)
  * </pre>
  *
- * Systems sit at ±systemSpacing/2 about each head, numbered in the +x direction, so an UP wheel
- * covers channel 0 before 1 and 2 before 3. A wheel covers a system for {@code footprintM / v}.
+ * Elements sit at ±systemSpacing/2 about each sensor. Following the installation rule in
+ * {@link WheelEvent}, element 2 (pin 4) is on the Wheel 1 side, so an UP wheel covers channel 3
+ * before 2 and 1 before 0. A wheel covers an element for {@code footprintM / v}.
  */
 public final class SimulatedTrain {
 
@@ -68,9 +70,10 @@ public final class SimulatedTrain {
         if (v <= 0) {
             throw new IllegalArgumentException("speedKmh must be > 0");
         }
+        // Rail position of channels 0..3: Wheel 2's elements 1 and 2, then Wheel 1's.
         double[] systems = {
-                -g.systemSpacingM() / 2, g.systemSpacingM() / 2,
-                g.headSpacingM() - g.systemSpacingM() / 2, g.headSpacingM() + g.systemSpacingM() / 2};
+                g.headSpacingM() + g.systemSpacingM() / 2, g.headSpacingM() - g.systemSpacingM() / 2,
+                g.systemSpacingM() / 2, -g.systemSpacingM() / 2};
         List<TimedMessage> messages = new ArrayList<>();
         long end = 0;
         for (double offset : spec.axleOffsetsM()) {

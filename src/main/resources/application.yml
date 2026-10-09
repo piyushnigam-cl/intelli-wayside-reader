@@ -124,12 +124,13 @@ wayside:
     source: SERIAL
     port: /dev/ttyAMA3
     baud: 115200
-    # Proven by a train of known direction, not by review.
-    up-is-a-to-b: true
-    # Rail distance head A -> head B, measured on site. 0 = no speed.
-    head-spacing-m: 0
-    # Between the two systems of one head, from the sensor datasheet. 0 = no single-head fallback.
-    system-spacing-m: 0
+    # Direction is fixed, not configured: Wheel 1 (J23) first = UP, Wheel 2 (J22) first = DOWN.
+    # Prove the wiring with a train of known direction.
+    # Rail distance Wheel 1 -> Wheel 2, measured on site. 0 = no sensor-to-sensor speed.
+    sensor-spacing-m: 0
+    # Between the two sensing elements of one RSR110d, measured on site (one value for both
+    # sensors). 0 = no speed at each sensor.
+    element-spacing-m: 0
     system-pair-max-ms: 2000
     link-timeout-ms: 3000
     # UNVERIFIED and deliberately zero: the serial link refuses to start until all three are set.

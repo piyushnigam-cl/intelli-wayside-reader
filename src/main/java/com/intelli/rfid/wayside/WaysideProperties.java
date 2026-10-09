@@ -125,24 +125,29 @@ public class WaysideProperties {
         private String port = "/dev/ttyAMA3";
         private int baud = 115200;
 
-        /**
-         * Which way is UP. Proven by a train of known direction on commissioning, never by review:
-         * wired the other way, every direction is confidently wrong.
+        /*
+         * Direction is not configurable (operator, 2026-10-09): Wheel 1 (J23) seeing the train first
+         * is UP, Wheel 2 (J22) first is DOWN. A site wired the other way round is rewired, not
+         * reconfigured. The old up-is-a-to-b flag is gone, and a site file that still sets it is
+         * ignored.
          */
-        private boolean upIsAToB = true;
-
-        /** Rail distance between head A and head B. 0 = no speed is reported. Measure on site. */
-        private double headSpacingM = 0;
 
         /**
-         * Distance between the two systems inside one head, for the coarse single-head speed
-         * fallback. 0 = no fallback. From the sensor datasheet.
+         * Rail distance between Wheel 1 and Wheel 2, measured on site. 0 = no sensor-to-sensor
+         * speed. Was {@code head-spacing-m}, which is still accepted.
          */
-        private double systemSpacingM = 0;
+        private double sensorSpacingM = 0;
 
         /**
-         * The longest time between the two systems of one head seeing the same wheel. Beyond this
-         * two pulses are not the same axle. system spacing / slowest speed, with margin.
+         * Distance between the two sensing elements inside one RSR110d, measured on site; one value
+         * for both sensors. Gives the speed at each sensor. 0 = no per-sensor speed. Was
+         * {@code system-spacing-m}, which is still accepted.
+         */
+        private double elementSpacingM = 0;
+
+        /**
+         * The longest time between the two elements of one sensor seeing the same wheel. Beyond this
+         * two pulses are not the same axle. element spacing / slowest speed, with margin.
          */
         private long systemPairMaxMs = 2000;
 
@@ -157,12 +162,14 @@ public class WaysideProperties {
         public void setPort(String port) { this.port = port; }
         public int getBaud() { return baud; }
         public void setBaud(int baud) { this.baud = baud; }
-        public boolean isUpIsAToB() { return upIsAToB; }
-        public void setUpIsAToB(boolean upIsAToB) { this.upIsAToB = upIsAToB; }
-        public double getHeadSpacingM() { return headSpacingM; }
-        public void setHeadSpacingM(double headSpacingM) { this.headSpacingM = headSpacingM; }
-        public double getSystemSpacingM() { return systemSpacingM; }
-        public void setSystemSpacingM(double systemSpacingM) { this.systemSpacingM = systemSpacingM; }
+        public double getSensorSpacingM() { return sensorSpacingM; }
+        public void setSensorSpacingM(double sensorSpacingM) { this.sensorSpacingM = sensorSpacingM; }
+        public double getElementSpacingM() { return elementSpacingM; }
+        public void setElementSpacingM(double elementSpacingM) { this.elementSpacingM = elementSpacingM; }
+        /** The old name of {@code sensor-spacing-m}, kept so an existing site file still binds. */
+        public void setHeadSpacingM(double headSpacingM) { this.sensorSpacingM = headSpacingM; }
+        /** The old name of {@code element-spacing-m}, kept so an existing site file still binds. */
+        public void setSystemSpacingM(double systemSpacingM) { this.elementSpacingM = systemSpacingM; }
         public long getSystemPairMaxMs() { return systemPairMaxMs; }
         public void setSystemPairMaxMs(long systemPairMaxMs) { this.systemPairMaxMs = systemPairMaxMs; }
         public long getLinkTimeoutMs() { return linkTimeoutMs; }

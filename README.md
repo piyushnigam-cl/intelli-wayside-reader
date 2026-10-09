@@ -7,13 +7,23 @@ speed. The reader makes **one cloud POST per train**.
 Design, and every value that still has to be measured on site: `docs/Wayside-Reader-Design.md` in
 the workspace repo (`intelli-rfid-reader`).
 
+## Wheel 1, Wheel 2 and direction (2026-10-09)
+
+**J23 is Wheel 1 and J22 is Wheel 2** (board silk). **Wheel 1 first = `UP`, Wheel 2 first = `DOWN`**,
+fixed in `AxleBuilder` and not configurable. In each RSR110d the element on pin 4 must be on the
+Wheel 1 side, or every pass reads `UNKNOWN`. Two distances, measured on site:
+`wayside.wheel.element-spacing-m` (between one sensor's two elements, one value for both; gives
+`speedAtWheel1Kmh` / `speedAtWheel2Kmh` per axle) and `wayside.wheel.sensor-spacing-m` (Wheel 1 to
+Wheel 2). The old names `system-spacing-m` / `head-spacing-m` still bind. The pass JSON keeps
+`headA`/`atA` = Wheel 2 and `headB`/`atB` = Wheel 1.
+
 ## State (2026-09-29)
 
 Phases 1 and 2 of the design's build plan are done:
 
 - **Pass logic**: `PassTracker`, a state machine (IDLE → OCCUPIED → TAIL). `AxleBuilder` pairs
-  each head's two systems into axles, then derives direction (UP/DOWN/MIXED/UNKNOWN, never a
-  majority vote), speed, and the per-head axle counts.
+  each sensor's two elements into axles, then derives direction (UP/DOWN/MIXED/UNKNOWN, never a
+  majority vote), speed, and the per-sensor axle counts.
 - **Wheel link**: protocol v1 (COBS + CRC-16/CCITT-FALSE, little-endian), `TickClock` (unwrap plus a
   linear tick→host fit), `SerialWheelSource` on `/dev/ttyAMA3` (configured with `stty`, no serial
   library), and `SimulatedWheelSource`, which plays trains as real encoded frames.
@@ -60,7 +70,7 @@ End to end with no module and no firmware (a simulated SAMD21 and an unopened re
 java -jar target/intelli-wayside-reader-1.0.0-SNAPSHOT.jar --server.port=18082 \
   --rfid.security.enabled=false --rfid.reader.auto-start=false \
   --wayside.wheel.source=SIMULATED --wayside.bench.enabled=true \
-  --wayside.wheel.head-spacing-m=20 --wayside.wheel.system-spacing-m=0.14 \
+  --wayside.wheel.sensor-spacing-m=20 --wayside.wheel.element-spacing-m=0.14 \
   --wayside.pass.axle-gap-ms=3000 --wayside.spool-dir=/tmp/wayside-spool \
   --wayside.cloud.spool-file=/tmp/wayside-cloud.jsonl \
   --wayside.cloud.dead-letter-file=/tmp/wayside-dead.jsonl \

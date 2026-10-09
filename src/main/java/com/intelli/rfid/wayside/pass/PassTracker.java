@@ -125,8 +125,8 @@ public class PassTracker {
         this.gpioTrigger = properties.getTrigger().getSource() == WaysideProperties.TriggerSource.GPIO;
         this.in1IsUp = properties.getTrigger().getGpio().isIn1IsUp();
         WaysideProperties.Wheel wheel = properties.getWheel();
-        this.axleConfig = new AxleBuilder.Config(wheel.isUpIsAToB(), wheel.getHeadSpacingM(),
-                wheel.getSystemSpacingM(), TimeUnit.MILLISECONDS.toMicros(wheel.getSystemPairMaxMs()));
+        this.axleConfig = new AxleBuilder.Config(wheel.getSensorSpacingM(),
+                wheel.getElementSpacingM(), TimeUnit.MILLISECONDS.toMicros(wheel.getSystemPairMaxMs()));
         this.tagsExpected = properties.getTrain().getTagsExpected();
         this.decoder = decoder;
         this.clocks = clocks;
@@ -333,8 +333,8 @@ public class PassTracker {
         carrier.passOpen(false);
         log.info("Pass closed {}: {} tag(s), train {}, direction {}, axles {}", reason,
                 tagList.size(), pass.train().id(), pass.wheels().direction(),
-                pass.wheels().axleCount() == null ? "-" : pass.wheels().axleCount().headA() + "/"
-                        + pass.wheels().axleCount().headB());
+                pass.wheels().axleCount() == null ? "-" : pass.wheels().axleCount().wheel1() + "/"
+                        + pass.wheels().axleCount().wheel2());
         publisher.accept(pass);
     }
 
@@ -380,7 +380,7 @@ public class PassTracker {
         all.addAll(analysis.notes());
         String link = degraded ? "DOWN" : linkLost ? "LOST" : "OK";
         return new PassResult.Wheels(link, analysis.direction(),
-                new PassResult.AxleCount(analysis.headA(), analysis.headB(), analysis.consistent()),
+                new PassResult.AxleCount(analysis.wheel2(), analysis.wheel1(), analysis.consistent()),
                 new PassResult.Speed(analysis.speedMin(), analysis.speedMean(), analysis.speedMax()),
                 analysis.axles(), all);
     }
@@ -404,7 +404,7 @@ public class PassTracker {
     }
 
     private static String channelName(int channel) {
-        return "head " + (channel < 2 ? "A" : "B") + " system " + (channel % 2 + 1);
+        return WheelEvent.name(channel);
     }
 
     private static long ms(long millis) {

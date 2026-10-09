@@ -43,8 +43,8 @@ class PassTrackerTest {
         properties.getPass().setRfidLeadMs(200);
         properties.getPass().setTagGapMs(1000);
         properties.getPass().setMaxPassMs(60000);
-        properties.getWheel().setHeadSpacingM(20);
-        properties.getWheel().setSystemSpacingM(0.14);
+        properties.getWheel().setSensorSpacingM(20);
+        properties.getWheel().setElementSpacingM(0.14);
         build();
     }
 
@@ -123,7 +123,7 @@ class PassTrackerTest {
         assertThat(pass.tags()).extracting(PassResult.Tag::epc).containsExactly("FRONT", "REAR");
         assertThat(pass.wheels().link()).isEqualTo("OK");
         assertThat(pass.wheels().direction()).isEqualTo(Direction.UP);
-        assertThat(pass.wheels().axleCount().headA()).isEqualTo(4);
+        assertThat(pass.wheels().axleCount().wheel2()).isEqualTo(4);
         assertThat(pass.wheels().axleCount().consistent()).isTrue();
         assertThat(pass.wheels().speedKmh().mean()).isBetween(39.0, 41.0);
     }
@@ -166,7 +166,7 @@ class PassTrackerTest {
         advanceTicking(1000 + 60_100);
         assertThat(published).singleElement().satisfies(p -> {
             assertThat(p.stopReason()).isEqualTo(StopReason.TIMEOUT);
-            assertThat(p.wheels().faults()).anyMatch(f -> f.contains("head B system 1")
+            assertThat(p.wheels().faults()).anyMatch(f -> f.contains("Wheel 1 element 1")
                     && f.contains("still covered"));
         });
         assertThat(carrier).containsExactly(true, false);

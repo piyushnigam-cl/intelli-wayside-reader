@@ -112,8 +112,8 @@ public class BenchController {
     /** The configured geometry where set, otherwise a plausible 20 m layout. */
     private SimulatedTrain.Geometry geometry() {
         WaysideProperties.Wheel wheel = properties.getWheel();
-        double heads = wheel.getHeadSpacingM() > 0 ? wheel.getHeadSpacingM() : 20.0;
-        double systems = wheel.getSystemSpacingM() > 0 ? wheel.getSystemSpacingM() : 0.14;
+        double heads = wheel.getSensorSpacingM() > 0 ? wheel.getSensorSpacingM() : 20.0;
+        double systems = wheel.getElementSpacingM() > 0 ? wheel.getElementSpacingM() : 0.14;
         return new SimulatedTrain.Geometry(heads, heads / 2, systems, 0.1, 5.0);
     }
 }

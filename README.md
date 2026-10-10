@@ -19,6 +19,17 @@ Wheel 2; 0 = the sum of `wheel1-to-wpms-m` + `wpms-length-m` + `wpms-to-wheel2-m
 element spacing 0.06 m, Wheel 1 → WPMS 13 m, WPMS 3.5 m, WPMS → Wheel 2 18.5 m. The pass JSON keeps
 `headA`/`atA` = Wheel 2 and `headB`/`atB` = Wheel 1.
 
+## The site: an Omron-run WPMS (2026-10-10)
+
+The Charkop Wheel Profile Measurement System is run today by an **Omron NX1P2-9024DT1** with an
+**NX-AD4204** analog card. This reader is added beside it: it reads the four wheel-sensor loops **in
+series with the NX-AD4204**, and its J26 outputs, through the interposer, **replace the Omron's
+outputs** to the SMC valve manifold (OUT1 flaps open, OUT2 flaps close, OUT3 Left External,
+OUT4 Internal pair, OUT5 Diameter pair, OUT6 Right External, OUT7 spare). The full record is in the
+workspace repo: `docs/WPMS-Charkop-System.md` (wiring, single loop supply, bypass links, output
+handover, cut-over order) and `docs/WPMS-Pneumatics-SMC.md` (valves and coil rules). The valve
+control itself is not yet in this app.
+
 ## State (2026-09-29)
 
 Phases 1 and 2 of the design's build plan are done:
